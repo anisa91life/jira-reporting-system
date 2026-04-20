@@ -38,3 +38,8 @@ export const getPMOSprintReport = async (projectKey, sprintId) => {
     const res = await api.get(`/reports/pmo-sprint/${projectKey}/${sprintId}`);
     return res.data;
 };
+
+export const getAISprintHealth = async (projectKey, sprintId) => {
+    const res = await api.post('/ai/sprint-health', { projectKey, sprintId });
+    return res.data;
+};

@@ -1,12 +1,31 @@
-import React from 'react';
-import { AlertCircle, CheckCircle, TrendingUp, TrendingDown, Clock, Bug, Shield, ArrowRight, CornerDownRight, Calendar, Info } from 'lucide-react';
+import React, { useState } from 'react';
+import { AlertCircle, CheckCircle, TrendingUp, TrendingDown, Clock, Bug, Shield, ArrowRight, CornerDownRight, Calendar, Info, Cpu, Loader } from 'lucide-react';
 import { CommitmentChart, BugTrendChart, WorkDistributionChart } from './PMOCharts';
 import InfoTooltip from './InfoTooltip';
+import { getAISprintHealth } from '../api/jiraApi';
 
-const PMOReport = ({ data }) => {
+const PMOReport = ({ data, projectKey, sprintId }) => {
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiError, setAiError] = useState('');
+
+  const generateAIInsights = async () => {
+    setIsAnalyzing(true);
+    setAiError('');
+    try {
+      const response = await getAISprintHealth(projectKey, sprintId);
+      setAiAnalysis(response.aiAnalysis);
+    } catch (err) {
+      setAiError('Failed to generate AI insights. Make sure the backend is fully configured.');
+      console.error(err);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   if (!data) return null;
 
-  // Handle case where API returned an error object instead of the report
+  // Handle API error
   if (data.error) {
     return (
       <div className="glass-panel" style={{ padding: '32px', textAlign: 'center' }}>
@@ -16,14 +35,24 @@ const PMOReport = ({ data }) => {
     );
   }
 
-  // Final fallback if data structure is missing
-  if (!data.summary || !data.metrics) {
+  // Handle FUTURE sprint — metrics are null, show a clean state
+  if (data.status === 'NOT_STARTED' || !data.metrics) {
     return (
-      <div className="glass-panel" style={{ padding: '32px', textAlign: 'center' }}>
-        <p>No report data available for this sprint.</p>
+      <div className="glass-panel fade-in" style={{ padding: '40px', textAlign: 'center', borderLeft: '4px solid #8b5cf6' }}>
+        <div style={{ fontSize: '3rem', marginBottom: '16px' }}>⏳</div>
+        <h2 style={{ fontSize: '1.4rem', marginBottom: '8px' }}>{data.sprintInfo?.name || 'Future Sprint'}</h2>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>
+          {data.message || 'Sprint has not started yet. No metrics available.'}
+        </p>
+        {data.sprintInfo?.startDate && (
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+            Scheduled start: <strong>{new Date(data.sprintInfo.startDate).toLocaleDateString()}</strong>
+          </p>
+        )}
       </div>
     );
   }
+
 
   const { summary, metrics, risks, decisions, charts, sprintInfo } = data;
 
@@ -95,6 +124,93 @@ const PMOReport = ({ data }) => {
             <p style={{ fontWeight: 500 }}>{summary.focusNext}</p>
           </div>
         </div>
+      </div>
+
+      {/* AI Analysis Section */}
+      <div className="glass-panel pmo-ai-section fade-in" style={{ padding: '32px', marginTop: '24px', marginBottom: '24px', background: 'linear-gradient(to right, rgba(168, 85, 247, 0.05), rgba(79, 70, 229, 0.05))', borderLeft: '4px solid #8b5cf6' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: aiAnalysis ? '20px' : '0' }}>
+          <h2 style={{ fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+            <Cpu size={24} style={{ color: '#8b5cf6' }} /> 
+            AI Health Analysis
+          </h2>
+          {!aiAnalysis && !isAnalyzing && (
+            <button onClick={generateAIInsights} className="primary-btn pulse-glow" style={{ background: 'linear-gradient(to right, #8b5cf6, #3b82f6)', border: 'none', padding: '10px 20px', borderRadius: '8px', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Cpu size={16} /> Generate Insights
+            </button>
+          )}
+          {isAnalyzing && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
+              Analyzing sprint data...
+            </div>
+          )}
+        </div>
+
+        {aiError && (
+          <div style={{ color: 'var(--accent-danger)', padding: '12px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px', marginTop: '16px' }}>
+            {aiError}
+          </div>
+        )}
+
+        {aiAnalysis && (() => {
+            const assessment = aiAnalysis.overallAssessment || '';
+            const healthColor = assessment.startsWith('red') ? 'var(--accent-danger)'
+                : assessment.startsWith('yellow') ? 'var(--accent-warning)'
+                : 'var(--accent-success)';
+            return (
+              <div className="ai-results fade-in-up" style={{ marginTop: '16px' }}>
+
+                {/* Overall Assessment */}
+                <div style={{ marginBottom: '20px', padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', borderLeft: `3px solid ${healthColor}` }}>
+                  <strong style={{ fontSize: '1.05rem', color: healthColor }}>{assessment}</strong>
+                </div>
+
+                {/* What Stands Out */}
+                {aiAnalysis.whatStandsOut && (
+                  <div style={{ marginBottom: '20px', padding: '14px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px' }}>
+                    <h4 style={{ color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px' }}>What Stands Out</h4>
+                    <p style={{ lineHeight: '1.6', margin: 0 }}>{aiAnalysis.whatStandsOut}</p>
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '20px' }}>
+                  <div>
+                    <h4 style={{ color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px' }}>Main Risks</h4>
+                    <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '10px', margin: 0 }}>
+                      {(aiAnalysis.mainRisks || []).map((risk, i) => (
+                        <li key={i} style={{ lineHeight: '1.5' }}>{risk}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 style={{ color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px' }}>Likely Causes</h4>
+                    <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '10px', margin: 0 }}>
+                      {(aiAnalysis.likelyCauses || []).map((cause, i) => (
+                        <li key={i} style={{ lineHeight: '1.5', color: 'var(--text-secondary)' }}>{cause}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                {(aiAnalysis.suggestedActions || []).length > 0 && (
+                  <div style={{ marginBottom: '20px', padding: '14px', background: 'rgba(139, 92, 246, 0.06)', borderRadius: '8px' }}>
+                    <h4 style={{ color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px' }}>Suggested Actions</h4>
+                    <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '10px', margin: 0 }}>
+                      {aiAnalysis.suggestedActions.map((action, i) => (
+                        <li key={i} style={{ lineHeight: '1.5' }}>{action}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {aiAnalysis.confidence && (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic', textAlign: 'right' }}>
+                    AI Confidence: {aiAnalysis.confidence}
+                  </div>
+                )}
+
+              </div>
+            );
+          })()}
       </div>
 
       {/* 2. Delivery Metrics (KPI) */}

@@ -127,7 +127,7 @@ function App() {
       <div className="header-section fade-in">
         <div>
           <h1 className="text-gradient" style={{ fontSize: '2.5rem', marginBottom: '8px' }}>
-            Jira Intelligence
+            Projects Report
           </h1>
           <p style={{ color: 'var(--text-secondary)' }}>Advanced reporting and analytics dashboard</p>
         </div>
@@ -211,7 +211,7 @@ function App() {
         <div className="fade-in" style={{ animationDelay: '0.2s', display: 'flex', flexDirection: 'column', gap: '32px' }}>
 
           {reportType === 'pmo' ? (
-            <PMOReport data={reportData} />
+            <PMOReport data={reportData} projectKey={selectedProject} sprintId={selectedSprint} />
           ) : (
             <>
               {/* Overall Mode Cards */}
