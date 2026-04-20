@@ -73,6 +73,13 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: var(--shadow-card);
 }
 
+.chart-panel {
+  background: #1c2635; /* Matched from reference image */
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
 .glass-card {
   background: linear-gradient(145deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.9) 100%);
   border: 1px solid var(--border-light);
@@ -333,8 +340,14 @@ h1, h2, h3, h4, h5, h6 {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 24px;
 }
+
+.overview-charts {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
 @media (max-width: 900px) {
   .grid-charts { grid-template-columns: 1fr; }
+  .overview-charts { grid-template-columns: 1fr; }
 }
 
 .chart-container {
