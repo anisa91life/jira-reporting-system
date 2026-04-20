@@ -14,6 +14,32 @@ const CustomTooltip = ({ active, payload }) => {
     return null;
 };
 
+const CustomStatusLegend = ({ payload }) => {
+    return (
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '10px 16px' }}>
+            {payload.map((entry, index) => (
+                <li key={`item-${index}`} style={{ display: 'flex', alignItems: 'center', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                    <span style={{ display: 'inline-block', width: '10px', height: '10px', backgroundColor: entry.color, borderRadius: '50%', marginRight: '8px', flexShrink: 0 }}></span>
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.value}</span>
+                </li>
+            ))}
+        </ul>
+    );
+};
+
+const CustomPriorityLegend = ({ payload }) => {
+    return (
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+            {payload.map((entry, index) => (
+                <li key={`item-${index}`} style={{ display: 'flex', alignItems: 'center', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    <span style={{ display: 'inline-block', width: '10px', height: '10px', backgroundColor: entry.color, borderRadius: '50%', marginRight: '8px', flexShrink: 0 }}></span>
+                    <span>{entry.value}</span>
+                </li>
+            ))}
+        </ul>
+    );
+};
+
 export const StatusPieChart = ({ data }) => {
     // Convert object to array for Recharts
     const chartData = Object.keys(data).map(key => ({
@@ -26,27 +52,31 @@ export const StatusPieChart = ({ data }) => {
     }
 
     return (
-        <div className="chart-container fade-in">
-            <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                    <Pie
-                        data={chartData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={80}
-                        outerRadius={120}
-                        paddingAngle={5}
-                        dataKey="value"
-                        stroke="none"
-                    >
-                        {chartData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend verticalAlign="bottom" height={36} wrapperStyle={{paddingTop: '20px'}}/>
-                </PieChart>
-            </ResponsiveContainer>
+        <div className="chart-container fade-in" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', height: '280px' }}>
+            <div style={{ width: '40%', height: '100%' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                        <Pie
+                            data={chartData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={65}
+                            outerRadius={105}
+                            paddingAngle={0}
+                            dataKey="value"
+                            stroke="none"
+                        >
+                            {chartData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                        </Pie>
+                        <Tooltip content={<CustomTooltip />} />
+                    </PieChart>
+                </ResponsiveContainer>
+            </div>
+            <div style={{ width: '60%', paddingLeft: '24px' }}>
+                <CustomStatusLegend payload={chartData.map((d, i) => ({ value: d.name, color: COLORS[i % COLORS.length] }))} />
+            </div>
         </div>
     );
 };
@@ -61,31 +91,41 @@ export const PriorityPieChart = ({ data }) => {
         return <div style={{height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)'}}>No Data Available</div>;
     }
 
-    // High/Medium/Low matching colors
-    const PRIORITY_COLORS = ['#ef4444', '#f59e0b', '#3b82f6', '#10b981', '#8b5cf6'];
+    const getPriorityColor = (priorityName) => {
+        const normalized = String(priorityName || '').toLowerCase();
+        if (normalized.includes('urgent')) return '#dc2626';
+        if (normalized.includes('high')) return '#ef4444';
+        if (normalized.includes('medium')) return '#f59e0b';
+        if (normalized.includes('low')) return '#3b82f6';
+        return '#8b5cf6';
+    };
 
     return (
-        <div className="chart-container fade-in">
-            <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                    <Pie
-                        data={chartData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
-                        paddingAngle={5}
-                        dataKey="value"
-                        stroke="none"
-                    >
-                        {chartData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={PRIORITY_COLORS[index % PRIORITY_COLORS.length]} />
-                        ))}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend verticalAlign="bottom" height={36} wrapperStyle={{paddingTop: '20px'}}/>
-                </PieChart>
-            </ResponsiveContainer>
+        <div className="chart-container fade-in" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', height: '280px' }}>
+            <div style={{ width: '40%', height: '100%' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                        <Pie
+                            data={chartData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={65}
+                            outerRadius={105}
+                            paddingAngle={0}
+                            dataKey="value"
+                            stroke="none"
+                        >
+                            {chartData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={getPriorityColor(entry.name)} />
+                            ))}
+                        </Pie>
+                        <Tooltip content={<CustomTooltip />} />
+                    </PieChart>
+                </ResponsiveContainer>
+            </div>
+            <div style={{ width: '60%', paddingLeft: '24px' }}>
+                <CustomPriorityLegend payload={chartData.map(d => ({ value: d.name, color: getPriorityColor(d.name) }))} />
+            </div>
         </div>
     );
 };

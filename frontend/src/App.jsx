@@ -401,27 +401,33 @@ function App() {
                 </div>
               )}
 
-              {/* Charts Row */}
-              <div className="grid-charts fade-in" style={{ animationDelay: '0.3s' }}>
-                <div className="glass-panel" style={{ padding: '24px' }}>
-                  <h3 style={{ marginBottom: '16px', fontSize: '1.1rem' }}>Status Distribution</h3>
-                  <StatusPieChart data={reportData.statusDistribution || (reportType === 'sprint' ? { 'Done': reportData.doneIssues, 'In Progress / To Do': reportData.notDoneIssues } : {})} />
+              <div className={`grid-charts fade-in ${reportType === 'overall' ? 'overview-charts' : ''}`} style={{ animationDelay: '0.3s' }}>
+                <div className="chart-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column' }}>
+                  <h3 style={{ marginBottom: '16px', fontSize: '1.2rem', fontWeight: 600 }}>Status Distribution</h3>
+                  <div style={{ flex: 1, minHeight: 0 }}>
+                    <StatusPieChart data={reportData.statusDistribution || (reportType === 'sprint' ? { 'Done': reportData.doneIssues, 'In Progress / To Do': reportData.notDoneIssues } : {})} />
+                  </div>
                 </div>
 
-                <div className="glass-panel" style={{ padding: '24px' }}>
-                  <h3 style={{ marginBottom: '16px', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <AlertTriangle size={18} style={{ color: 'var(--accent-warning)' }} />
+                <div className="chart-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column' }}>
+                  <h3 style={{ marginBottom: '16px', fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
                     Priority Breakdown
                   </h3>
-                  <PriorityPieChart data={reportData.priorityDistribution || {}} />
+                  <div style={{ flex: 1, minHeight: 0 }}>
+                    <PriorityPieChart data={reportData.priorityDistribution || {}} />
+                  </div>
                 </div>
 
-                <div className="glass-panel" style={{ padding: '24px' }}>
-                  <h3 style={{ marginBottom: '16px', fontSize: '1.1rem' }}>
-                    {reportType === 'overall' ? 'Assignees Load' : 'Team Members'}
-                  </h3>
-                  <AssigneeBarChart data={reportData.assigneeDistribution || {}} />
-                </div>
+                {reportType !== 'overall' && (
+                  <div className="chart-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column' }}>
+                    <h3 style={{ marginBottom: '16px', fontSize: '1.2rem', fontWeight: 600 }}>
+                      Team Members
+                    </h3>
+                    <div style={{ flex: 1, minHeight: 0 }}>
+                      <AssigneeBarChart data={reportData.assigneeDistribution || {}} />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="fade-in" style={{ animationDelay: '0.4s' }}>

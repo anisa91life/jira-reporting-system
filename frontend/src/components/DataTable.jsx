@@ -7,6 +7,15 @@ const getTagClass = (status) => {
     return 'todo';
 };
 
+const getPriorityColor = (priority) => {
+    const value = String(priority || '').toLowerCase();
+    if (value.includes('urgent')) return '#dc2626';
+    if (value.includes('high')) return '#ef4444';
+    if (value.includes('medium')) return '#f59e0b';
+    if (value.includes('low')) return '#3b82f6';
+    return 'var(--text-secondary)';
+};
+
 const DataTable = ({ issues }) => {
     if (!issues || issues.length === 0) {
         return (
@@ -45,9 +54,7 @@ const DataTable = ({ issues }) => {
                                 <td style={{ color: 'var(--text-secondary)' }}>{issue.assignee}</td>
                                 <td>
                                     <span style={{ 
-                                        color: issue.priority.toLowerCase().includes('high') ? 'var(--accent-danger)' : 
-                                               issue.priority.toLowerCase().includes('low') ? 'var(--text-secondary)' : 
-                                               'var(--accent-warning)',
+                                        color: getPriorityColor(issue.priority),
                                         fontWeight: 600,
                                         fontSize: '0.85rem'
                                     }}>
