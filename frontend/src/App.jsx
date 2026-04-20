@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Layers, Activity, ActivitySquare, CheckCircle, Users, AlertTriangle } from 'lucide-react';
 import * as api from './api/jiraApi';
 import ReportCard from './components/ReportCard';
@@ -19,11 +19,17 @@ function App() {
   // Specific selections
   const [selectedSprint, setSelectedSprint] = useState('');
   const [selectedEpic, setSelectedEpic] = useState('');
+  const [isSprintDropdownOpen, setIsSprintDropdownOpen] = useState(false);
+  const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
+  const [isReportTypeDropdownOpen, setIsReportTypeDropdownOpen] = useState(false);
 
   // Data
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const sprintDropdownRef = useRef(null);
+  const projectDropdownRef = useRef(null);
+  const reportTypeDropdownRef = useRef(null);
 
   // 1. Load Projects on Mount
   useEffect(() => {
@@ -116,10 +122,50 @@ function App() {
     setSelectedProject(e.target.value);
     setReportData(null);
   };
-  const handleReportTypeChange = (e) => {
-    setReportType(e.target.value);
+  const handleReportTypeSelect = (type) => {
+    setReportType(type);
     setReportData(null);
+    setIsReportTypeDropdownOpen(false);
   };
+  const handleProjectSelect = (projectKey) => {
+    setSelectedProject(projectKey);
+    setReportData(null);
+    setIsProjectDropdownOpen(false);
+  };
+  const reportTypeOptions = [
+    { value: 'overall', label: 'Overall Project Report' },
+    { value: 'sprint', label: 'Sprint Analysis' },
+    { value: 'pmo', label: 'PMO Sprint Report' },
+    { value: 'epic', label: 'Epic Breakdown' }
+  ];
+  const selectedReportTypeOption = reportTypeOptions.find(option => option.value === reportType);
+
+  const sortedSprints = [...sprints].sort((a, b) => {
+    if (a.state === 'active' && b.state !== 'active') return -1;
+    if (a.state !== 'active' && b.state === 'active') return 1;
+    return 0;
+  });
+  const selectedProjectOption = projects.find(p => p.key === selectedProject);
+  const activeSprints = sortedSprints.filter(s => s.state === 'active');
+  const nonActiveSprints = sortedSprints.filter(s => s.state !== 'active');
+  const selectedSprintOption = sortedSprints.find(s => String(s.id) === String(selectedSprint));
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (sprintDropdownRef.current && !sprintDropdownRef.current.contains(event.target)) {
+        setIsSprintDropdownOpen(false);
+      }
+      if (projectDropdownRef.current && !projectDropdownRef.current.contains(event.target)) {
+        setIsProjectDropdownOpen(false);
+      }
+      if (reportTypeDropdownRef.current && !reportTypeDropdownRef.current.contains(event.target)) {
+        setIsReportTypeDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <div className="app-container">
@@ -146,38 +192,130 @@ function App() {
       <div className="controls-section fade-in" style={{ animationDelay: '0.1s' }}>
         <div>
           <label className="label">Project</label>
-          <div className="select-wrapper">
-            <select className="select-field" value={selectedProject} onChange={handleProjectChange}>
-              <option value="">-- Select Project --</option>
-              {projects.map(p => (
-                <option key={p.id} value={p.key}>{p.name} ({p.key})</option>
-              ))}
-            </select>
+          <div className="project-dropdown" ref={projectDropdownRef}>
+            <button
+              type="button"
+              className="sprint-dropdown-trigger"
+              onClick={() => setIsProjectDropdownOpen(prev => !prev)}
+            >
+              <span>{selectedProjectOption ? `${selectedProjectOption.name} (${selectedProjectOption.key})` : '-- Select Project --'}</span>
+              <span className={`sprint-dropdown-chevron ${isProjectDropdownOpen ? 'open' : ''}`}>▼</span>
+            </button>
+
+            {isProjectDropdownOpen && (
+              <div className="sprint-dropdown-panel">
+                <div className="sprint-dropdown-heading">Projects</div>
+                <div className="sprint-option-list">
+                  {projects.map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`sprint-option ${selectedProject === p.key ? 'selected' : ''}`}
+                      onClick={() => handleProjectSelect(p.key)}
+                    >
+                      <span>{`${p.name} (${p.key})`}</span>
+                      {selectedProject === p.key && <span className="sprint-check">✓</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         <div>
           <label className="label">Report Type</label>
-          <div className="select-wrapper">
-            <select className="select-field" value={reportType} onChange={handleReportTypeChange} disabled={!selectedProject}>
-              <option value="overall">Overall Project Report</option>
-              <option value="sprint">Sprint Analysis</option>
-              <option value="pmo">PMO Sprint Report</option>
-              <option value="epic">Epic Breakdown</option>
-            </select>
+          <div className="reporttype-dropdown" ref={reportTypeDropdownRef}>
+            <button
+              type="button"
+              className="sprint-dropdown-trigger"
+              onClick={() => selectedProject && setIsReportTypeDropdownOpen(prev => !prev)}
+              disabled={!selectedProject}
+              style={{ opacity: selectedProject ? 1 : 0.6, cursor: selectedProject ? 'pointer' : 'not-allowed' }}
+            >
+              <span>{selectedReportTypeOption?.label || 'Overall Project Report'}</span>
+              <span className={`sprint-dropdown-chevron ${isReportTypeDropdownOpen ? 'open' : ''}`}>▼</span>
+            </button>
+
+            {isReportTypeDropdownOpen && (
+              <div className="sprint-dropdown-panel">
+                <div className="sprint-dropdown-heading">Report Type</div>
+                <div className="sprint-option-list">
+                  {reportTypeOptions.map(option => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`sprint-option ${reportType === option.value ? 'selected' : ''}`}
+                      onClick={() => handleReportTypeSelect(option.value)}
+                    >
+                      <span>{option.label}</span>
+                      {reportType === option.value && <span className="sprint-check">✓</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         {(reportType === 'sprint' || reportType === 'pmo') && (
           <div>
             <label className="label">Select Sprint</label>
-            <div className="select-wrapper">
-              <select className="select-field" value={selectedSprint} onChange={e => setSelectedSprint(e.target.value)}>
-                <option value="">-- Choose Sprint --</option>
-                {sprints.map(s => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.state})</option>
-                ))}
-              </select>
+            <div className="sprint-dropdown" ref={sprintDropdownRef}>
+              <button
+                type="button"
+                className="sprint-dropdown-trigger"
+                onClick={() => setIsSprintDropdownOpen(prev => !prev)}
+              >
+                <span>{selectedSprintOption ? selectedSprintOption.name : '-- Choose Sprint --'}</span>
+                <span className={`sprint-dropdown-chevron ${isSprintDropdownOpen ? 'open' : ''}`}>▼</span>
+              </button>
+
+              {isSprintDropdownOpen && (
+                <div className="sprint-dropdown-panel">
+                  {activeSprints.length > 0 && (
+                    <div className="sprint-dropdown-section">
+                      <div className="sprint-dropdown-heading">Active Sprint</div>
+                      {activeSprints.map(s => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          className={`sprint-option sprint-option-active ${String(selectedSprint) === String(s.id) ? 'selected' : ''}`}
+                          onClick={() => {
+                            setSelectedSprint(s.id);
+                            setIsSprintDropdownOpen(false);
+                          }}
+                        >
+                          <span className="sprint-active-mark">⚡</span>
+                          <span>{s.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {nonActiveSprints.length > 0 && (
+                    <div className="sprint-dropdown-section">
+                      <div className="sprint-dropdown-heading">Other Sprints</div>
+                      <div className="sprint-option-list">
+                        {nonActiveSprints.map(s => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            className={`sprint-option ${String(selectedSprint) === String(s.id) ? 'selected' : ''}`}
+                            onClick={() => {
+                              setSelectedSprint(s.id);
+                              setIsSprintDropdownOpen(false);
+                            }}
+                          >
+                            <span>{s.name}</span>
+                            {String(selectedSprint) === String(s.id) && <span className="sprint-check">✓</span>}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
