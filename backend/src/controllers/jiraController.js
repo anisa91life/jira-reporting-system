@@ -25,7 +25,7 @@ const getProjectSprints = async (req, res) => {
         if (scrumBoards.length === 0) {
             return res.json([]); // No scrum boards, so no sprints
         }
-        
+
         const boardId = scrumBoards[0].id;
         const sprintsRes = await jiraService.getSprints(boardId);
         res.json(sprintsRes.values || []);
@@ -57,22 +57,22 @@ const getTeamMembers = async (projectKey) => {
         // We look for common role names that usually define the core team
         // Common roles: 'Administrators', 'Developers', 'Service Desk Team', 'Members'
         const teamRoleNames = ['Developers', 'Members', 'Software Development', 'Administrators', 'Service Desk Team'];
-        
+
         const allMemberNames = new Set();
-        
+
         for (const roleName of Object.keys(roles)) {
             if (teamRoleNames.includes(roleName)) {
                 const roleId = roles[roleName].split('/').pop();
                 const members = await jiraService.getRoleMembers(projectKey, roleId);
-                
+
                 members.forEach(m => {
                     // Only include human users (type: atlassian-user-role-actor)
                     if (m.type === 'atlassian-user-role-actor' && m.displayName) {
                         const name = m.displayName.toLowerCase();
-                        const isNotBot = !name.includes('bot') && 
-                                        !name.includes('automation') &&
-                                        !name.includes('addon');
-                        
+                        const isNotBot = !name.includes('bot') &&
+                            !name.includes('automation') &&
+                            !name.includes('addon');
+
                         if (isNotBot) {
                             allMemberNames.add(m.displayName);
                         }
@@ -91,13 +91,13 @@ const getOverallReport = async (req, res) => {
     const { projectKey } = req.params;
     try {
         // Query to get all standard issues for the project
-        const jql = `project = "${projectKey}" AND issuetype != Epic`;
+        const jql = `project = "${projectKey}"`;
         const data = await jiraService.getIssuesByJQL(jql);
         const issues = data.issues || [];
 
         // Aggregating statistics
         const result = {
-            totalIssues: issues.length,
+            totalIssues: 0, // Calculated during iteration (excluding Done issues)
             statusDistribution: {},
             priorityDistribution: {},
             assigneeDistribution: {}
@@ -110,6 +110,14 @@ const getOverallReport = async (req, res) => {
         });
 
         issues.forEach(issue => {
+            const statusCatName = issue.fields.status?.statusCategory?.name;
+            const statusCatKey = issue.fields.status?.statusCategory?.key;
+
+            // Only count issues that are NOT in a Done status
+            if (statusCatName !== 'Done' && statusCatKey !== 'done') {
+                result.totalIssues++;
+            }
+
             const status = issue.fields.status?.name || 'Unknown';
             const priority = issue.fields.priority?.name || 'None';
             const assignee = issue.fields.assignee?.displayName || 'Unassigned';
@@ -153,7 +161,7 @@ const getSprintReport = async (req, res) => {
         issues.forEach(issue => {
             const status = issue.fields.status?.name || 'Unknown';
             const priority = issue.fields.priority?.name || 'None';
-            
+
             result.statusDistribution[status] = (result.statusDistribution[status] || 0) + 1;
             result.priorityDistribution[priority] = (result.priorityDistribution[priority] || 0) + 1;
 
