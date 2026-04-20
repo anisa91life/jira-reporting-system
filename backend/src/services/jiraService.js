@@ -108,7 +108,7 @@ const jiraService = {
             const response = await api.post('rest/api/3/search/jql', payload);
             allIssues = allIssues.concat(response.data.issues || []);
             nextPageToken = response.data.nextPageToken;
-            if (allIssues.length >= 1000) break;
+            if (allIssues.length >= 800000) break;
         } while (nextPageToken);
         return { issues: allIssues, total: allIssues.length };
     },
