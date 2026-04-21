@@ -5,6 +5,7 @@ import ReportCard from './components/ReportCard';
 import { StatusPieChart, AssigneeBarChart, PriorityPieChart } from './components/Charts';
 import DataTable from './components/DataTable';
 import PMOReport from './components/PMOReport';
+import ReleaseReport from './components/ReleaseReport';
 
 const getInitialState = (key, defaultVal) => {
   const params = new URLSearchParams(window.location.search);
@@ -106,6 +107,9 @@ function App() {
             if (prev && e.some(epic => String(epic.key) === String(prev))) return prev;
             return '';
           });
+        } else if (reportType === 'releases') {
+          const d = await api.getReleasesReport(selectedProject);
+          setReportData(d);
         } else {
           // Overall Report
           const d = await api.getOverallReport(selectedProject);
@@ -182,7 +186,8 @@ function App() {
     { value: 'overall', label: 'Overall Project Report' },
     { value: 'sprint', label: 'Sprint Analysis' },
     { value: 'pmo', label: 'PMO Sprint Report' },
-    { value: 'epic', label: 'Epic Breakdown' }
+    { value: 'epic', label: 'Epic Breakdown' },
+    { value: 'releases', label: 'KPI Releases' }
   ];
   const selectedReportTypeOption = reportTypeOptions.find(option => option.value === reportType);
 
@@ -396,6 +401,8 @@ function App() {
 
           {reportType === 'pmo' ? (
             <PMOReport data={reportData} projectKey={selectedProject} sprintId={selectedSprint} />
+          ) : reportType === 'releases' ? (
+            <ReleaseReport data={reportData} projectKey={selectedProject} />
           ) : (
             <>
               {/* Overall Mode Cards */}
