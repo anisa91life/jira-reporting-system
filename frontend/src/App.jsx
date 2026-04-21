@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Layers, Activity, ActivitySquare, CheckCircle, Users, AlertTriangle } from 'lucide-react';
 import * as api from './api/jiraApi';
 import ReportCard from './components/ReportCard';
-import { StatusPieChart, AssigneeBarChart, PriorityPieChart } from './components/Charts';
+import { StatusPieChart, PriorityPieChart } from './components/Charts';
 import DataTable from './components/DataTable';
 import PMOReport from './components/PMOReport';
 
@@ -92,7 +92,7 @@ function App() {
     const fetchDropdownData = async () => {
       setLoading(true);
       try {
-        if (reportType === 'sprint' || reportType === 'pmo') {
+        if (reportType === 'pmo') {
           const s = await api.getProjectSprints(selectedProject);
           setSprints(s);
           setSelectedSprint(prev => {
@@ -123,19 +123,14 @@ function App() {
 
   // 3. Fetch specific Sprint data
   useEffect(() => {
-    if ((reportType === 'sprint' || reportType === 'pmo') && selectedProject && selectedSprint) {
+    if (reportType === 'pmo' && selectedProject && selectedSprint) {
       const getSprint = async () => {
         setLoading(true);
         try {
-          let data;
-          if (reportType === 'pmo') {
-            data = await api.getPMOSprintReport(selectedProject, selectedSprint);
-          } else {
-            data = await api.getSprintReport(selectedProject, selectedSprint);
-          }
+          const data = await api.getPMOSprintReport(selectedProject, selectedSprint);
           setReportData(data);
         } catch (e) {
-          setError('Failed to fetch sprint report');
+          setError('Failed to fetch PMO sprint report');
         } finally {
           setLoading(false);
         }
@@ -180,7 +175,6 @@ function App() {
   };
   const reportTypeOptions = [
     { value: 'overall', label: 'Overall Project Report' },
-    { value: 'sprint', label: 'Sprint Analysis' },
     { value: 'pmo', label: 'PMO Sprint Report' },
     { value: 'epic', label: 'Epic Breakdown' }
   ];
@@ -304,7 +298,7 @@ function App() {
           </div>
         </div>
 
-        {(reportType === 'sprint' || reportType === 'pmo') && (
+        {reportType === 'pmo' && (
           <div>
             <label className="label">Select Sprint</label>
             <div className="sprint-dropdown" ref={sprintDropdownRef}>
@@ -415,25 +409,6 @@ function App() {
                 </div>
               )}
 
-              {/* Sprint Mode Cards */}
-              {reportType === 'sprint' && (
-                <div className="grid-cards">
-                  <ReportCard title="Sprint Scope" value={reportData.totalIssues} subtitle="Total issues in sprint" icon={Layers} />
-                  <ReportCard
-                    title="Completion"
-                    value={`${reportData.completionPercentage || 0}%`}
-                    subtitle={`${reportData.doneIssues} Done / ${reportData.notDoneIssues} Remaining`}
-                    icon={CheckCircle} colorClass="accent-success"
-                  />
-                  <ReportCard
-                    title="Team Load"
-                    value={Object.keys(reportData.assigneeDistribution || {}).length}
-                    subtitle="Active Assignees"
-                    icon={Users} colorClass="text-accent"
-                  />
-                </div>
-              )}
-
               {/* Epic Mode Cards */}
               {reportType === 'epic' && (
                 <div className="grid-cards">
@@ -464,39 +439,35 @@ function App() {
                   </div>
                 </div>
 
-                {reportType !== 'overall' && (
+                {reportType === 'epic' && (
                   <div className="chart-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column' }}>
                     <h3 style={{ marginBottom: '16px', fontSize: '1.2rem', fontWeight: 600 }}>
                       Team Members
                     </h3>
                     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-                      {reportType === 'epic' ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          {reportData.teamMembers && reportData.teamMembers.length > 0 ? (
-                            reportData.teamMembers.map((member, idx) => (
-                              <div key={member.accountId || idx} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                {member.avatarUrl ? (
-                                  <img src={member.avatarUrl} alt={member.displayName} style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
-                                ) : (
-                                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold' }}>
-                                    {member.displayName.charAt(0)}
-                                  </div>
-                                )}
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{member.displayName}</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {reportData.teamMembers && reportData.teamMembers.length > 0 ? (
+                          reportData.teamMembers.map((member, idx) => (
+                            <div key={member.accountId || idx} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                              {member.avatarUrl ? (
+                                <img src={member.avatarUrl} alt={member.displayName} style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
+                              ) : (
+                                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold' }}>
+                                  {member.displayName.charAt(0)}
                                 </div>
-                                <div style={{ background: 'rgba(56, 189, 248, 0.1)', color: 'var(--text-accent)', padding: '4px 12px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 600 }}>
-                                  {member.ticketCount} {member.ticketCount === 1 ? 'ticket' : 'tickets'}
-                                </div>
+                              )}
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{member.displayName}</div>
                               </div>
-                            ))
-                          ) : (
-                            <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '32px 0' }}>No Data Available</div>
-                          )}
-                        </div>
-                      ) : (
-                        <AssigneeBarChart data={reportData.assigneeDistribution || {}} />
-                      )}
+                              <div style={{ background: 'rgba(56, 189, 248, 0.1)', color: 'var(--text-accent)', padding: '4px 12px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 600 }}>
+                                {member.ticketCount} {member.ticketCount === 1 ? 'ticket' : 'tickets'}
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '32px 0' }}>No Data Available</div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}

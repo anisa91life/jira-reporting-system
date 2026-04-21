@@ -141,58 +141,7 @@ const getOverallReport = async (req, res) => {
     }
 };
 
-const getSprintReport = async (req, res) => {
-    const { projectKey, sprintId } = req.params;
-    try {
-        const jql = `project = "${projectKey}" AND Sprint = ${sprintId}`;
-        const data = await jiraService.getIssuesByJQL(jql);
-        const issues = data.issues || [];
 
-        const result = {
-            totalIssues: issues.length,
-            doneIssues: 0,
-            notDoneIssues: 0,
-            statusDistribution: {},
-            priorityDistribution: {},
-            assigneeDistribution: {},
-            completionPercentage: 0
-        };
-
-        issues.forEach(issue => {
-            const status = issue.fields.status?.name || 'Unknown';
-            const priority = issue.fields.priority?.name || 'None';
-
-            result.statusDistribution[status] = (result.statusDistribution[status] || 0) + 1;
-            result.priorityDistribution[priority] = (result.priorityDistribution[priority] || 0) + 1;
-
-            const statusCat = issue.fields.status?.statusCategory?.key || '';
-            if (statusCat === 'done') {
-                result.doneIssues++;
-            } else {
-                result.notDoneIssues++;
-            }
-
-            const assignee = issue.fields.assignee?.displayName || 'Unassigned';
-            result.assigneeDistribution[assignee] = (result.assigneeDistribution[assignee] || 0) + 1;
-        });
-
-        if (result.totalIssues > 0) {
-            result.completionPercentage = ((result.doneIssues / result.totalIssues) * 100).toFixed(2);
-        }
-
-        result.recentIssues = issues.slice(0, 10).map(i => ({
-            key: i.key,
-            summary: i.fields.summary,
-            status: i.fields.status?.name || 'Unknown',
-            assignee: i.fields.assignee?.displayName || 'Unassigned',
-            priority: i.fields.priority?.name || 'None'
-        }));
-
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-};
 
 const getEpicReport = async (req, res) => {
     const { projectKey, epicId } = req.params;
@@ -269,6 +218,5 @@ module.exports = {
     getProjectSprints,
     getProjectEpics,
     getOverallReport,
-    getSprintReport,
     getEpicReport
 };

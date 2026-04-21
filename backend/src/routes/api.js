@@ -15,7 +15,7 @@ router.get('/projects/:projectKey/epics', jiraController.getProjectEpics);
 
 // Reports Routes
 router.get('/reports/overall/:projectKey', jiraController.getOverallReport);
-router.get('/reports/sprint/:projectKey/:sprintId', jiraController.getSprintReport);
+
 router.get('/reports/epic/:projectKey/:epicId', jiraController.getEpicReport);
 router.get('/reports/pmo-sprint/:projectKey/:sprintId', pmoController.getPMOSprintReport);
 
