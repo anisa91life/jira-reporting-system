@@ -70,14 +70,14 @@ const PMOReport = ({ data, projectKey, sprintId }) => {
 
   return (
     <div className="pmo-section-container fade-in">
-      
+
       {/* 0. Sprint Timing Bar */}
       {sprintInfo && (
         <div className="glass-panel sprint-timing-bar fade-in">
           <div className="timing-left">
             <Calendar size={18} className="text-accent" />
             <span className="timing-dates">
-              Sprint Duration: <strong>{formatDate(sprintInfo.startDate)} → {formatDate(sprintInfo.endDate)}</strong> 
+              Sprint Duration: <strong>{formatDate(sprintInfo.startDate)} → {formatDate(sprintInfo.endDate)}</strong>
               <span style={{ opacity: 0.6, marginLeft: '8px' }}>({sprintInfo.totalDays} days)</span>
             </span>
           </div>
@@ -93,45 +93,12 @@ const PMOReport = ({ data, projectKey, sprintId }) => {
           </div>
         </div>
       )}
-
-      {/* 1. Executive Summary */}
-      <div className="glass-panel" style={{ padding: '32px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-          <div>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '8px' }}>Executive Summary</h2>
-            <p style={{ color: 'var(--text-secondary)', maxWidth: '600px' }}>{summary.summaryText}</p>
-          </div>
-          <div className="pmo-health-indicator">
-            <span className="pmo-health-circle">{summary.health}</span>
-            <span className="pmo-health-text" style={{ 
-              color: summary.health === '🔴' ? 'var(--accent-danger)' : 
-                     summary.health === '🟡' ? 'var(--accent-warning)' : 
-                     summary.health === '🔵' ? 'var(--text-accent)' : 
-                     'var(--accent-success)' 
-            }}>
-              {summary.healthText}
-            </span>
-          </div>
-        </div>
-        
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-          <div className="glass-card" style={{ padding: '16px' }}>
-            <h4 style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '8px' }}>Main Risk</h4>
-            <p style={{ fontWeight: 500 }}>{summary.mainRisk}</p>
-          </div>
-          <div className="glass-card" style={{ padding: '16px' }}>
-            <h4 style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '8px' }}>Focus Next Sprint</h4>
-            <p style={{ fontWeight: 500 }}>{summary.focusNext}</p>
-          </div>
-        </div>
-      </div>
-
       {/* AI Analysis Section */}
-      <div className="glass-panel pmo-ai-section fade-in" style={{ padding: '32px', marginTop: '24px', marginBottom: '24px', background: 'linear-gradient(to right, rgba(168, 85, 247, 0.05), rgba(79, 70, 229, 0.05))', borderLeft: '4px solid #8b5cf6' }}>
+      <div className="glass-panel pmo-ai-section fade-in" style={{ padding: '12px', background: 'linear-gradient(to right, rgba(168, 85, 247, 0.05), rgba(79, 70, 229, 0.05))', borderLeft: '4px solid #8b5cf6' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: aiAnalysis ? '20px' : '0' }}>
-          <h2 style={{ fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
-            <Cpu size={24} style={{ color: '#8b5cf6' }} /> 
-            AI Health Analysis
+          <h2 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+            <Cpu size={24} style={{ color: '#8b5cf6' }} />
+            AI Sprint Analysis
           </h2>
           {!aiAnalysis && !isAnalyzing && (
             <button onClick={generateAIInsights} className="primary-btn pulse-glow" style={{ background: 'linear-gradient(to right, #8b5cf6, #3b82f6)', border: 'none', padding: '10px 20px', borderRadius: '8px', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -152,66 +119,100 @@ const PMOReport = ({ data, projectKey, sprintId }) => {
         )}
 
         {aiAnalysis && (() => {
-            const assessment = aiAnalysis.overallAssessment || '';
-            const healthColor = assessment.startsWith('red') ? 'var(--accent-danger)'
-                : assessment.startsWith('yellow') ? 'var(--accent-warning)'
-                : 'var(--accent-success)';
-            return (
-              <div className="ai-results fade-in-up" style={{ marginTop: '16px' }}>
+          const assessment = aiAnalysis.overallAssessment || '';
+          const healthColor = assessment.startsWith('red') ? 'var(--accent-danger)'
+            : assessment.startsWith('yellow') ? 'var(--accent-warning)'
+              : 'var(--accent-success)';
+          return (
+            <div className="ai-results fade-in-up" style={{ marginTop: '16px' }}>
 
-                {/* Overall Assessment */}
-                <div style={{ marginBottom: '20px', padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', borderLeft: `3px solid ${healthColor}` }}>
-                  <strong style={{ fontSize: '1.05rem', color: healthColor }}>{assessment}</strong>
-                </div>
-
-                {/* What Stands Out */}
-                {aiAnalysis.whatStandsOut && (
-                  <div style={{ marginBottom: '20px', padding: '14px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px' }}>
-                    <h4 style={{ color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px' }}>What Stands Out</h4>
-                    <p style={{ lineHeight: '1.6', margin: 0 }}>{aiAnalysis.whatStandsOut}</p>
-                  </div>
-                )}
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '20px' }}>
-                  <div>
-                    <h4 style={{ color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px' }}>Main Risks</h4>
-                    <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '10px', margin: 0 }}>
-                      {(aiAnalysis.mainRisks || []).map((risk, i) => (
-                        <li key={i} style={{ lineHeight: '1.5' }}>{risk}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 style={{ color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px' }}>Likely Causes</h4>
-                    <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '10px', margin: 0 }}>
-                      {(aiAnalysis.likelyCauses || []).map((cause, i) => (
-                        <li key={i} style={{ lineHeight: '1.5', color: 'var(--text-secondary)' }}>{cause}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                {(aiAnalysis.suggestedActions || []).length > 0 && (
-                  <div style={{ marginBottom: '20px', padding: '14px', background: 'rgba(139, 92, 246, 0.06)', borderRadius: '8px' }}>
-                    <h4 style={{ color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px' }}>Suggested Actions</h4>
-                    <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '10px', margin: 0 }}>
-                      {aiAnalysis.suggestedActions.map((action, i) => (
-                        <li key={i} style={{ lineHeight: '1.5' }}>{action}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {aiAnalysis.confidence && (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic', textAlign: 'right' }}>
-                    AI Confidence: {aiAnalysis.confidence}
-                  </div>
-                )}
-
+              {/* Overall Assessment */}
+              <div style={{ marginBottom: '20px', padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', borderLeft: `3px solid ${healthColor}` }}>
+                <strong style={{ fontSize: '1.05rem', color: healthColor }}>{assessment}</strong>
               </div>
-            );
-          })()}
+
+              {/* What Stands Out */}
+              {aiAnalysis.whatStandsOut && (
+                <div style={{ marginBottom: '20px', padding: '14px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px' }}>
+                  <h4 style={{ color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px' }}>What Stands Out</h4>
+                  <p style={{ lineHeight: '1.6', margin: 0 }}>{aiAnalysis.whatStandsOut}</p>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '20px' }}>
+                <div>
+                  <h4 style={{ color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px' }}>Main Risks</h4>
+                  <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '10px', margin: 0 }}>
+                    {(aiAnalysis.mainRisks || []).map((risk, i) => (
+                      <li key={i} style={{ lineHeight: '1.5' }}>{risk}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h4 style={{ color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px' }}>Likely Causes</h4>
+                  <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '10px', margin: 0 }}>
+                    {(aiAnalysis.likelyCauses || []).map((cause, i) => (
+                      <li key={i} style={{ lineHeight: '1.5', color: 'var(--text-secondary)' }}>{cause}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              {(aiAnalysis.suggestedActions || []).length > 0 && (
+                <div style={{ marginBottom: '20px', padding: '14px', background: 'rgba(139, 92, 246, 0.06)', borderRadius: '8px' }}>
+                  <h4 style={{ color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '1px' }}>Suggested Actions</h4>
+                  <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '10px', margin: 0 }}>
+                    {aiAnalysis.suggestedActions.map((action, i) => (
+                      <li key={i} style={{ lineHeight: '1.5' }}>{action}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {aiAnalysis.confidence && (
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic', textAlign: 'right' }}>
+                  AI Confidence: {aiAnalysis.confidence}
+                </div>
+              )}
+
+            </div>
+          );
+        })()}
       </div>
+
+      {/* 1. Executive Summary */}
+      <div className="glass-panel" style={{ padding: '32px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+          <div>
+            <h2 style={{ fontSize: '1.5rem', marginBottom: '8px' }}>Executive Summary</h2>
+            <p style={{ color: 'var(--text-secondary)', maxWidth: '600px' }}>{summary.summaryText}</p>
+          </div>
+          <div className="pmo-health-indicator">
+            <span className="pmo-health-circle">{summary.health}</span>
+            <span className="pmo-health-text" style={{
+              color: summary.health === '🔴' ? 'var(--accent-danger)' :
+                summary.health === '🟡' ? 'var(--accent-warning)' :
+                  summary.health === '🔵' ? 'var(--text-accent)' :
+                    'var(--accent-success)'
+            }}>
+              {summary.healthText}
+            </span>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+          <div className="glass-card" style={{ padding: '16px' }}>
+            <h4 style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '8px' }}>Main Risk</h4>
+            <p style={{ fontWeight: 500 }}>{summary.mainRisk}</p>
+          </div>
+          <div className="glass-card" style={{ padding: '16px' }}>
+            <h4 style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '8px' }}>Focus Next Sprint</h4>
+            <p style={{ fontWeight: 500 }}>{summary.focusNext}</p>
+          </div>
+        </div>
+      </div>
+
+
 
       {/* 2. Delivery Metrics (KPI) */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '8px' }}>
@@ -284,16 +285,16 @@ const PMOReport = ({ data, projectKey, sprintId }) => {
           <CommitmentChart data={charts.commitment} />
         </div>
         <div className="glass-panel" style={{ padding: '24px' }}>
-            <h3 style={{ marginBottom: '24px', fontSize: '1rem' }}>Work Distribution (Planned vs Unplanned)</h3>
-            <WorkDistributionChart data={charts.workDistribution} />
+          <h3 style={{ marginBottom: '24px', fontSize: '1rem' }}>Work Distribution (Planned vs Unplanned)</h3>
+          <WorkDistributionChart data={charts.workDistribution} />
         </div>
         <div className="glass-panel" style={{ padding: '24px' }}>
-            <h3 style={{ marginBottom: '24px', fontSize: '1rem' }}>Bugs Creation vs Resolution</h3>
-            <BugTrendChart data={[
-                { name: 'Start', created: 0, resolved: 0 },
-                { name: 'Mid', created: Math.ceil(metrics[4].value.split('/')[0] / 2), resolved: Math.ceil(metrics[4].value.split('/')[1] / 2) },
-                { name: 'End', created: parseInt(metrics[4].value.split('/')[0]), resolved: parseInt(metrics[4].value.split('/')[1]) }
-            ]} />
+          <h3 style={{ marginBottom: '24px', fontSize: '1rem' }}>Bugs Creation vs Resolution</h3>
+          <BugTrendChart data={[
+            { name: 'Start', created: 0, resolved: 0 },
+            { name: 'Mid', created: Math.ceil(metrics[4].value.split('/')[0] / 2), resolved: Math.ceil(metrics[4].value.split('/')[1] / 2) },
+            { name: 'End', created: parseInt(metrics[4].value.split('/')[0]), resolved: parseInt(metrics[4].value.split('/')[1]) }
+          ]} />
         </div>
       </div>
 
