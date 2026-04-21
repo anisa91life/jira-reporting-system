@@ -469,8 +469,34 @@ function App() {
                     <h3 style={{ marginBottom: '16px', fontSize: '1.2rem', fontWeight: 600 }}>
                       Team Members
                     </h3>
-                    <div style={{ flex: 1, minHeight: 0 }}>
-                      <AssigneeBarChart data={reportData.assigneeDistribution || {}} />
+                    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                      {reportType === 'epic' ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {reportData.teamMembers && reportData.teamMembers.length > 0 ? (
+                            reportData.teamMembers.map((member, idx) => (
+                              <div key={member.accountId || idx} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                {member.avatarUrl ? (
+                                  <img src={member.avatarUrl} alt={member.displayName} style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
+                                ) : (
+                                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold' }}>
+                                    {member.displayName.charAt(0)}
+                                  </div>
+                                )}
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{member.displayName}</div>
+                                </div>
+                                <div style={{ background: 'rgba(56, 189, 248, 0.1)', color: 'var(--text-accent)', padding: '4px 12px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 600 }}>
+                                  {member.ticketCount} {member.ticketCount === 1 ? 'ticket' : 'tickets'}
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '32px 0' }}>No Data Available</div>
+                          )}
+                        </div>
+                      ) : (
+                        <AssigneeBarChart data={reportData.assigneeDistribution || {}} />
+                      )}
                     </div>
                   </div>
                 )}
