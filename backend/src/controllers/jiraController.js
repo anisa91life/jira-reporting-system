@@ -340,6 +340,6 @@ module.exports = {
     getProjectSprints,
     getProjectEpics,
     getOverallReport,
-    getSprintReport,
+    getProjectReleasesReport,
     getEpicReport
 };
