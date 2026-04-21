@@ -207,12 +207,30 @@ const getEpicReport = async (req, res) => {
             remainingIssues: 0,
             statusDistribution: {},
             priorityDistribution: {},
-            progressPercentage: 0
+            progressPercentage: 0,
+            teamMembers: []
         };
+        
+        const assigneeMap = {};
 
         issues.forEach(issue => {
             const priority = issue.fields.priority?.name || 'None';
             result.priorityDistribution[priority] = (result.priorityDistribution[priority] || 0) + 1;
+            
+            // Extract Assignee
+            const assignee = issue.fields.assignee;
+            if (assignee) {
+                const id = assignee.accountId || assignee.displayName;
+                if (!assigneeMap[id]) {
+                    assigneeMap[id] = {
+                        accountId: assignee.accountId || '',
+                        displayName: assignee.displayName || 'Unknown',
+                        avatarUrl: assignee.avatarUrls ? (assignee.avatarUrls['48x48'] || assignee.avatarUrls['32x32']) : '',
+                        ticketCount: 0
+                    };
+                }
+                assigneeMap[id].ticketCount++;
+            }
 
             const statusCat = issue.fields.status?.statusCategory?.key || '';
             if (statusCat === 'done') {
@@ -228,6 +246,8 @@ const getEpicReport = async (req, res) => {
         if (result.totalIssues > 0) {
             result.progressPercentage = ((result.doneIssues / result.totalIssues) * 100).toFixed(2);
         }
+        
+        result.teamMembers = Object.values(assigneeMap).sort((a, b) => b.ticketCount - a.ticketCount);
 
         result.recentIssues = issues.slice(0, 10).map(i => ({
             key: i.key,
