@@ -671,3 +671,53 @@ h1, h2, h3, h4, h5, h6 {
   border-style: solid;
   border-color: #1e293b transparent transparent transparent;
 }
+
+/* Tabs & Buttons */
+.segment-tab {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.segment-tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.segment-tab.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.btn-invisible {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-invisible:hover {
+  opacity: 0.8;
+}
+
+.report-card {
+  background: var(--bg-tertiary);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+}
+
+.icon-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

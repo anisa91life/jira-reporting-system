@@ -42,6 +42,18 @@ const jiraService = {
         }
     },
 
+    // Platform API for fetching versions (releases)
+    getProjectVersions: async (projectKey) => {
+        try {
+            const api = getAxiosInstance();
+            const response = await api.get(`/rest/api/3/project/${projectKey}/version`);
+            return response.data;
+        } catch (error) {
+            console.error(`Error fetching versions for ${projectKey}:`, error.response?.data || error.message);
+            throw error;
+        }
+    },
+
     // Agile API for boards
     getBoardsByProject: async (projectKey) => {
         try {
@@ -100,7 +112,7 @@ const jiraService = {
             const payload = {
                 jql: jql,
                 maxResults: 100,
-                fields: ["summary", "status", "assignee", "priority", "issuetype", "parent"]
+                fields: ["summary", "status", "assignee", "priority", "issuetype", "parent", "fixVersions"]
             };
             if (nextPageToken) payload.nextPageToken = nextPageToken;
 
@@ -195,7 +207,7 @@ const jiraService = {
                 jql: jql,
                 maxResults: 100,
                 expand: "changelog",
-                fields: ["summary", "status", "assignee", "priority", "issuetype", "parent", "issuelinks", "created", "updated", "customfield_11224", "customfield_10004", "customfield_10007"]
+                fields: ["summary", "status", "assignee", "priority", "issuetype", "parent", "issuelinks", "created", "updated", "fixVersions", "customfield_11224", "customfield_10004", "customfield_10007"]
             };
             if (nextPageToken) payload.nextPageToken = nextPageToken;
 

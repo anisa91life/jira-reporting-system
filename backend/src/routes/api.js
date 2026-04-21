@@ -17,6 +17,7 @@ router.get('/projects/:projectKey/epics', jiraController.getProjectEpics);
 router.get('/reports/overall/:projectKey', jiraController.getOverallReport);
 
 router.get('/reports/epic/:projectKey/:epicId', jiraController.getEpicReport);
+router.get('/reports/releases/:projectKey', jiraController.getProjectReleasesReport);
 router.get('/reports/pmo-sprint/:projectKey/:sprintId', pmoController.getPMOSprintReport);
 
 // AI Analysis Routes
