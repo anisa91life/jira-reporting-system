@@ -130,27 +130,3 @@ export const PriorityPieChart = ({ data }) => {
     );
 };
 
-export const AssigneeBarChart = ({ data }) => {
-    const chartData = Object.keys(data).map(key => ({
-        name: key,
-        Issues: data[key]
-    }));
-
-    if (chartData.length === 0) {
-        return <div style={{height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)'}}>No Data Available</div>;
-    }
-
-    return (
-        <div className="chart-container fade-in">
-            <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                    <XAxis dataKey="name" stroke="var(--text-secondary)" tick={{fontSize: 11, fill: 'var(--text-secondary)'}} interval={0} angle={-40} textAnchor="end" height={70} />
-                    <YAxis stroke="var(--text-secondary)" tick={{fontSize: 12}} />
-                    <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(255,255,255,0.02)'}} />
-                    <Bar dataKey="Issues" fill="var(--accent-primary)" radius={[4, 4, 0, 0]} barSize={40} />
-                </BarChart>
-            </ResponsiveContainer>
-        </div>
-    );
-};

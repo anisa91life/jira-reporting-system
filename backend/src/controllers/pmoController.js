@@ -168,7 +168,6 @@ const getPMOSprintReport = async (req, res) => {
         let removedPoints = 0;
 
         // FIX #2/#3: Scope change and unplanned work using issue.fields.created vs sprint.startDate
-        // This is far more reliable and accurate than changelog Sprint field parsing
         let scopeAddedPoints = 0;   // Issues CREATED after sprint start (true new scope)
         let scopeAddedKeys = [];
 
@@ -178,15 +177,49 @@ const getPMOSprintReport = async (req, res) => {
         let criticalBugsResolved = 0;
         let blockedCount = 0;
         const assigneeWorkload = {};
+        
+        // Standard aggregations
+        let doneIssuesCount = 0;
+        let notDoneIssuesCount = 0;
+        const statusDistribution = {};
+        const priorityDistribution = {};
+        const assigneeMap = {};
 
         issues.forEach(issue => {
+            // Standard distributions
+            const status = issue.fields.status?.name || 'Unknown';
+            const priority = issue.fields.priority?.name || 'None';
+            statusDistribution[status] = (statusDistribution[status] || 0) + 1;
+            priorityDistribution[priority] = (priorityDistribution[priority] || 0) + 1;
+
             // Story Points
             const pts11224 = parseFloat(issue.fields['customfield_11224']) || 0;
             const pts10004 = parseFloat(issue.fields['customfield_10004']) || 0;
             const points = pts10004 || pts11224 || 0;
 
+            // Extract Assignee for Team Members section
+            const assignee = issue.fields.assignee;
+            if (assignee) {
+                const id = assignee.accountId || assignee.displayName;
+                if (!assigneeMap[id]) {
+                    assigneeMap[id] = {
+                        accountId: assignee.accountId || '',
+                        displayName: assignee.displayName || 'Unknown',
+                        avatarUrl: assignee.avatarUrls ? (assignee.avatarUrls['48x48'] || assignee.avatarUrls['32x32']) : '',
+                        storyPoints: 0
+                    };
+                }
+                assigneeMap[id].storyPoints += points;
+            }
+
             const isDone = isEffectivelyDone(issue);
             const isLate = isLateStage(issue);
+            
+            if (isDone) {
+                doneIssuesCount++;
+            } else {
+                notDoneIssuesCount++;
+            }
 
             // FIX #2: Use issue creation date to classify scope change
             // Issues created AFTER sprint start = added scope (no changelog parsing needed)
@@ -403,6 +436,23 @@ const getPMOSprintReport = async (req, res) => {
 
         const getTrend = (val) => val > 0 ? '↑' : val < 0 ? '↓' : '→';
 
+        const assigneeDistribution = {};
+        Object.entries(assigneeWorkload).forEach(([name, data]) => {
+            assigneeDistribution[name] = data.totalTickets;
+        });
+
+        const teamMembers = Object.values(assigneeMap).sort((a, b) => b.storyPoints - a.storyPoints);
+
+        const recentIssues = issues.slice(0, 10).map(i => ({
+            key: i.key,
+            summary: i.fields.summary,
+            status: i.fields.status?.name || 'Unknown',
+            assignee: i.fields.assignee?.displayName || 'Unassigned',
+            priority: i.fields.priority?.name || 'None'
+        }));
+        
+        const completionPercentage = issues.length > 0 ? ((doneIssuesCount / issues.length) * 100).toFixed(1) : 0;
+
         const report = {
             sprintInfo,
             status: healthStatus,
@@ -487,7 +537,17 @@ const getPMOSprintReport = async (req, res) => {
                     { name: 'Planned', value: deliveredPoints },
                     { name: 'Unplanned', value: unplannedDeliveredPoints }
                 ]
-            }
+            },
+            // Legacy standard sprint metrics appended for unified view
+            totalIssues: issues.length,
+            doneIssuesCount,
+            notDoneIssuesCount,
+            completionPercentage,
+            statusDistribution,
+            priorityDistribution,
+            assigneeDistribution,
+            teamMembers,
+            recentIssues
         };
 
         res.json(report);

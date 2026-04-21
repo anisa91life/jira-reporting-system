@@ -24,10 +24,6 @@ export const getOverallReport = async (projectKey) => {
     return res.data;
 };
 
-export const getSprintReport = async (projectKey, sprintId) => {
-    const res = await api.get(`/reports/sprint/${projectKey}/${sprintId}`);
-    return res.data;
-};
 
 export const getEpicReport = async (projectKey, epicId) => {
     const res = await api.get(`/reports/epic/${projectKey}/${epicId}`);

@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
-import { AlertCircle, CheckCircle, TrendingUp, TrendingDown, Clock, Bug, Shield, ArrowRight, CornerDownRight, Calendar, Info, Cpu, Loader } from 'lucide-react';
+import { AlertCircle, CheckCircle, TrendingUp, TrendingDown, Clock, Bug, Shield, ArrowRight, CornerDownRight, Calendar, Info, Cpu, Loader, Layers, Activity, ActivitySquare, Users } from 'lucide-react';
 import { CommitmentChart, BugTrendChart, WorkDistributionChart } from './PMOCharts';
+import { StatusPieChart, PriorityPieChart } from './Charts';
+import DataTable from './DataTable';
+import ReportCard from './ReportCard';
 import InfoTooltip from './InfoTooltip';
 import { getAISprintHealth } from '../api/jiraApi';
 
@@ -212,6 +215,25 @@ const PMOReport = ({ data, projectKey, sprintId }) => {
         </div>
       </div>
 
+      {/* At A Glance (Legacy Sprint Breakdown) */}
+      {data.totalIssues !== undefined && (
+        <div className="grid-cards" style={{ marginBottom: '24px' }}>
+          <ReportCard title="Sprint Scope" value={data.totalIssues} subtitle="Total issues in sprint" icon={Layers} />
+          <ReportCard
+            title="Completion"
+            value={`${data.completionPercentage || 0}%`}
+            subtitle={`${data.doneIssuesCount || 0} Done / ${data.notDoneIssuesCount || 0} Remaining`}
+            icon={CheckCircle} colorClass="accent-success"
+          />
+          <ReportCard
+            title="Team Load"
+            value={Object.keys(data.assigneeDistribution || {}).length}
+            subtitle="Active Assignees"
+            icon={Users} colorClass="text-accent"
+          />
+        </div>
+      )}
+
 
 
       {/* 2. Delivery Metrics (KPI) */}
@@ -297,6 +319,69 @@ const PMOReport = ({ data, projectKey, sprintId }) => {
           ]} />
         </div>
       </div>
+
+      {/* 5. Classic Breakdown Charts */}
+      {data.statusDistribution && (
+        <div className="grid-charts fade-in" style={{ animationDelay: '0.3s' }}>
+          <div className="chart-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column' }}>
+            <h3 style={{ marginBottom: '16px', fontSize: '1.2rem', fontWeight: 600 }}>Status Distribution</h3>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <StatusPieChart data={data.statusDistribution} />
+            </div>
+          </div>
+
+          <div className="chart-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column' }}>
+            <h3 style={{ marginBottom: '16px', fontSize: '1.2rem', fontWeight: 600 }}>Priority Breakdown</h3>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <PriorityPieChart data={data.priorityDistribution || {}} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. Recent Data Table */}
+      {data.recentIssues && (
+        <div className="fade-in" style={{ animationDelay: '0.4s', marginTop: '32px' }}>
+          <DataTable issues={data.recentIssues} />
+        </div>
+      )}
+
+      {/* 7. Team Members */}
+      {data.teamMembers && (
+        <div className="glass-panel fade-in" style={{ padding: '32px', marginTop: '32px', animationDelay: '0.5s' }}>
+          <h3 style={{ marginBottom: '24px', fontSize: '1.2rem', fontWeight: 600 }}>Team Members</h3>
+          {data.teamMembers.length > 0 ? (
+            <div className="team-grid">
+              {data.teamMembers.map((member, idx) => (
+                <div key={idx} className="glass-card team-card-compact fade-in" style={{ animationDelay: `${0.5 + (idx * 0.05)}s` }}>
+                  {/* Avatar Section */}
+                  {member.avatarUrl ? (
+                    <img src={member.avatarUrl} alt={member.displayName} style={{ width: '48px', height: '48px', borderRadius: '50%', border: '2px solid rgba(139, 92, 246, 0.3)' }} />
+                  ) : (
+                    <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.2))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.2rem', color: '#a78bfa', border: '2px solid rgba(139, 92, 246, 0.3)' }}>
+                      {member.displayName.charAt(0)}
+                    </div>
+                  )}
+                  
+                  {/* Info Section */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{member.displayName}</span>
+                  </div>
+
+                  {/* Badge Section */}
+                  <div className="badge badge-active" style={{ fontSize: '0.8rem', padding: '4px 10px', background: 'rgba(139, 92, 246, 0.1)', color: '#a78bfa', width: 'fit-content' }}>
+                    {member.storyPoints} SP
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+              No Data Available
+            </div>
+          )}
+        </div>
+      )}
 
     </div>
   );
