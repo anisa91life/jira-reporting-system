@@ -6,19 +6,26 @@ import { StatusPieChart, AssigneeBarChart, PriorityPieChart } from './components
 import DataTable from './components/DataTable';
 import PMOReport from './components/PMOReport';
 
+const getInitialState = (key, defaultVal) => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.has(key)) return params.get(key);
+  const saved = localStorage.getItem(`dashboard_${key}`);
+  return saved || defaultVal;
+};
+
 function App() {
   const [projects, setProjects] = useState([]);
-  const [selectedProject, setSelectedProject] = useState('');
+  const [selectedProject, setSelectedProject] = useState(() => getInitialState('project', ''));
 
-  const [reportType, setReportType] = useState('overall'); // overall, sprint, epic
+  const [reportType, setReportType] = useState(() => getInitialState('reportType', 'overall')); // overall, sprint, epic
 
   // Dynamic lists
   const [sprints, setSprints] = useState([]);
   const [epics, setEpics] = useState([]);
 
   // Specific selections
-  const [selectedSprint, setSelectedSprint] = useState('');
-  const [selectedEpic, setSelectedEpic] = useState('');
+  const [selectedSprint, setSelectedSprint] = useState(() => getInitialState('sprintId', ''));
+  const [selectedEpic, setSelectedEpic] = useState(() => getInitialState('epicId', ''));
   const [isSprintDropdownOpen, setIsSprintDropdownOpen] = useState(false);
   const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
   const [isReportTypeDropdownOpen, setIsReportTypeDropdownOpen] = useState(false);
@@ -30,6 +37,39 @@ function App() {
   const sprintDropdownRef = useRef(null);
   const projectDropdownRef = useRef(null);
   const reportTypeDropdownRef = useRef(null);
+
+  // Sync state to URL and localStorage
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const updates = {
+      project: selectedProject,
+      reportType: reportType,
+      sprintId: selectedSprint,
+      epicId: selectedEpic
+    };
+
+    let urlChanged = false;
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value) {
+        if (params.get(key) !== value) {
+          params.set(key, value);
+          urlChanged = true;
+        }
+        localStorage.setItem(`dashboard_${key}`, value);
+      } else {
+        if (params.has(key)) {
+          params.delete(key);
+          urlChanged = true;
+        }
+        localStorage.removeItem(`dashboard_${key}`);
+      }
+    });
+
+    if (urlChanged) {
+      const newUrl = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [selectedProject, reportType, selectedSprint, selectedEpic]);
 
   // 1. Load Projects on Mount
   useEffect(() => {
@@ -55,11 +95,17 @@ function App() {
         if (reportType === 'sprint' || reportType === 'pmo') {
           const s = await api.getProjectSprints(selectedProject);
           setSprints(s);
-          setSelectedSprint('');
+          setSelectedSprint(prev => {
+            if (prev && s.some(sprint => String(sprint.id) === String(prev))) return prev;
+            return '';
+          });
         } else if (reportType === 'epic') {
           const e = await api.getProjectEpics(selectedProject);
           setEpics(e);
-          setSelectedEpic('');
+          setSelectedEpic(prev => {
+            if (prev && e.some(epic => String(epic.key) === String(prev))) return prev;
+            return '';
+          });
         } else {
           // Overall Report
           const d = await api.getOverallReport(selectedProject);
