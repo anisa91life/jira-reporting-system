@@ -39,6 +39,11 @@ export const getPMOSprintReport = async (projectKey, sprintId) => {
     return res.data;
 };
 
+export const getReleasesReport = async (projectKey) => {
+    const res = await api.get(`/reports/releases/${projectKey}`);
+    return res.data;
+};
+
 export const getAISprintHealth = async (projectKey, sprintId) => {
     const res = await api.post('/ai/sprint-health', { projectKey, sprintId });
     return res.data;

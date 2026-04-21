@@ -210,13 +210,13 @@ const getEpicReport = async (req, res) => {
             progressPercentage: 0,
             teamMembers: []
         };
-        
+
         const assigneeMap = {};
 
         issues.forEach(issue => {
             const priority = issue.fields.priority?.name || 'None';
             result.priorityDistribution[priority] = (result.priorityDistribution[priority] || 0) + 1;
-            
+
             // Extract Assignee
             const assignee = issue.fields.assignee;
             if (assignee) {
@@ -246,7 +246,7 @@ const getEpicReport = async (req, res) => {
         if (result.totalIssues > 0) {
             result.progressPercentage = ((result.doneIssues / result.totalIssues) * 100).toFixed(2);
         }
-        
+
         result.teamMembers = Object.values(assigneeMap).sort((a, b) => b.ticketCount - a.ticketCount);
 
         result.recentIssues = issues.slice(0, 10).map(i => ({
@@ -264,11 +264,134 @@ const getEpicReport = async (req, res) => {
     }
 };
 
+const getProjectReleasesReport = async (req, res) => {
+    const { projectKey } = req.params;
+    try {
+        const versionsData = await jiraService.getProjectVersions(projectKey);
+        const versions = Array.isArray(versionsData) ? versionsData : (versionsData?.values || []);
+
+        const jql = `project = "${projectKey}" AND fixVersion IS NOT EMPTY`;
+        const data = await jiraService.getIssuesWithChangelog(jql);
+        const issues = data.issues || [];
+
+        // Build release map
+        const releases = versions.map(v => ({
+            id: v.id,
+            name: v.name,
+            description: v.description || '',
+            startDate: v.startDate,
+            releaseDate: v.releaseDate,
+            released: v.released,
+            metrics: {
+                totalIssues: 0,
+                completedIssues: 0,
+                rolledOverIssues: 0,
+                addedDuringRelease: 0,
+                notCompletedIssues: 0,
+            },
+            issues: {
+                rolledOver: [],
+                addedDuring: [],
+                notCompleted: [],
+                completed: []
+            }
+        })).sort((a, b) => new Date(b.startDate || 0) - new Date(a.startDate || 0));
+
+        const releaseMap = {};
+        releases.forEach(r => releaseMap[r.id] = r);
+
+        issues.forEach(issue => {
+            const fixVersions = issue.fields.fixVersions || [];
+            fixVersions.forEach(fv => {
+                const release = releaseMap[fv.id];
+                if (!release) return;
+
+                const statusCat = issue.fields.status?.statusCategory?.key || '';
+                const isFinished = statusCat === 'done';
+                const createdDate = new Date(issue.fields.created);
+                const startDate = release.startDate ? new Date(release.startDate) : null;
+
+                let addedAfterStart = false;
+                let wasInPreviousRelease = false;
+
+                if (issue.changelog && issue.changelog.histories) {
+                    issue.changelog.histories.forEach(history => {
+                        const historyDate = new Date(history.created);
+                        history.items.forEach(item => {
+                            if (item.field === 'Fix Version') {
+                                if (item.toString && item.toString.includes(fv.name)) {
+                                    if (startDate && historyDate > startDate) {
+                                        addedAfterStart = true;
+                                    }
+                                }
+                                if (item.fromString) {
+                                    wasInPreviousRelease = true;
+                                }
+                            }
+                        });
+                    });
+                }
+
+                if (startDate && createdDate > startDate && !addedAfterStart) {
+                    addedAfterStart = true;
+                }
+
+                if (startDate && createdDate < startDate && !addedAfterStart) {
+                    wasInPreviousRelease = true;
+                }
+
+                let category = 'ongoing';
+
+                if (addedAfterStart) {
+                    category = 'addedDuring';
+                    release.metrics.addedDuringRelease++;
+                } else if (wasInPreviousRelease) {
+                    category = 'rolledOver';
+                    release.metrics.rolledOverIssues++;
+                }
+
+                release.metrics.totalIssues++;
+
+                if (isFinished) {
+                    release.metrics.completedIssues++;
+                    if (category !== 'addedDuring' && category !== 'rolledOver') category = 'completed';
+                } else {
+                    release.metrics.notCompletedIssues++;
+                    if (category !== 'addedDuring' && category !== 'rolledOver') category = 'notCompleted';
+                }
+
+                const d = new Date(issue.fields.created);
+                const df = d.toLocaleDateString();
+
+                const issueData = {
+                    key: issue.key,
+                    title: issue.fields.summary,
+                    status: issue.fields.status?.name || 'Unknown',
+                    assignee: issue.fields.assignee?.displayName || 'Unassigned',
+                    priority: issue.fields.priority?.name || 'None',
+                    addedToRelease: addedAfterStart ? 'After Start' : df
+                };
+
+                if (category === 'rolledOver') release.issues.rolledOver.push(issueData);
+                else if (category === 'addedDuring') release.issues.addedDuring.push(issueData);
+                else if (!isFinished) release.issues.notCompleted.push(issueData);
+                else release.issues.completed.push(issueData);
+            });
+        });
+
+        res.json({ releases });
+
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 module.exports = {
     getProjects,
     getProjectSprints,
     getProjectEpics,
     getOverallReport,
     getSprintReport,
-    getEpicReport
+    getEpicReport,
+    getProjectReleasesReport
 };
