@@ -198,21 +198,6 @@ const getPMOSprintReport = async (req, res) => {
             const pts10004 = parseFloat(issue.fields['customfield_10004']) || 0;
             const points = pts10004 || pts11224 || 0;
 
-            // Extract Assignee for Team Members section
-            const assignee = issue.fields.assignee;
-            if (assignee) {
-                const id = assignee.accountId || assignee.displayName;
-                if (!assigneeMap[id]) {
-                    assigneeMap[id] = {
-                        accountId: assignee.accountId || '',
-                        displayName: assignee.displayName || 'Unknown',
-                        avatarUrl: assignee.avatarUrls ? (assignee.avatarUrls['48x48'] || assignee.avatarUrls['32x32']) : '',
-                        storyPoints: 0
-                    };
-                }
-                assigneeMap[id].storyPoints += points;
-            }
-
             const isDone = isEffectivelyDone(issue);
             const isLate = isLateStage(issue);
 
@@ -232,6 +217,13 @@ const getPMOSprintReport = async (req, res) => {
             let addedDate = null;
             let removedDate = null;
 
+            // NOTE: We no longer track `currentlyInSprint` via changelog.
+            // Jira's `sprint = X` JQL already returns ONLY issues currently associated
+            // with sprint X. The previous changelog-based tracking used substring
+            // matching (e.g. "15".includes("5") === true) which caused false positives,
+            // incorrectly marking removed issues as "in sprint" and adding phantom assignees.
+            // Every issue returned by the JQL IS in the sprint — no further filtering needed.
+
             if (issue.changelog && issue.changelog.histories) {
                 const sortedHistories = [...issue.changelog.histories].sort(
                     (a, b) => new Date(a.created) - new Date(b.created)
@@ -243,11 +235,12 @@ const getPMOSprintReport = async (req, res) => {
                             const toVal = item.to ? String(item.to) : '';
                             const fromVal = item.from ? String(item.from) : '';
 
-                            if (toVal.includes(sprintId.toString()) && !addedDate) {
+                            // Use exact sprint ID matching (not substring)
+                            if (matchesSprintId(toVal) && !addedDate) {
                                 addedDate = historyDate;
                                 addedToSprintViaChangelog = true;
                             }
-                            if (fromVal.includes(sprintId.toString())) {
+                            if (matchesSprintId(fromVal)) {
                                 removedDate = historyDate;
                             }
                         }
@@ -259,6 +252,28 @@ const getPMOSprintReport = async (req, res) => {
             // AND was moved into the sprint (from another sprint or backlog)
             const isRollover = !wasCreatedAfterSprintStart && addedToSprintViaChangelog && addedDate && addedDate <= startDate;
             if (isRollover) rolloverIssueKeys.push(issue.key);
+
+            // Populate Team Members Map STRICTLY from sprint issues with an assignee.
+            // Every issue returned by the JQL `sprint = ${sprintId}` IS in the sprint —
+            // no `currentlyInSprint` gate needed (that was the bug).
+            if (issue.fields.assignee) {
+                const assignee = issue.fields.assignee;
+                const id = assignee.accountId || assignee.displayName;
+                
+                if (!teamMembersMap[id]) {
+                    teamMembersMap[id] = {
+                        accountId: assignee.accountId || '',
+                        displayName: assignee.displayName || 'Unknown',
+                        avatarUrl: assignee.avatarUrls ? (assignee.avatarUrls['48x48'] || assignee.avatarUrls['32x32']) : '',
+                        storyPoints: 0,
+                        ticketCount: 0
+                    };
+                    teamMembersDebugLog[id] = { keys: [] };
+                }
+                teamMembersMap[id].storyPoints += points;
+                teamMembersMap[id].ticketCount += 1;
+                teamMembersDebugLog[id].keys.push(issue.key);
+            }
 
             // Classification:
             // - Committed = existed at sprint start (created before sprint start)
@@ -441,7 +456,26 @@ const getPMOSprintReport = async (req, res) => {
             assigneeDistribution[name] = data.totalTickets;
         });
 
-        const teamMembers = Object.values(assigneeMap).sort((a, b) => b.storyPoints - a.storyPoints);
+        // STRICT FILTER: Remove any member with ticketCount <= 0 OR storyPoints <= 0
+        // This ensures members who only have 0-point tickets (like old epics/subtasks) do not appear.
+        const finalTeamMembers = Object.values(teamMembersMap)
+            .filter(member => member.ticketCount > 0 && member.storyPoints > 0)
+            .sort((a, b) => b.storyPoints - a.storyPoints);
+
+        // --- VERIFICATION DEBUG LOGS ---
+        const sprintIssueKeys = issues.map(i => i.key);
+        console.log(`[PMO Team Members] ============================================`);
+        console.log(`[PMO Team Members] Sprint: "${sprint.name}" (ID: ${sprintId})`);
+        console.log(`[PMO Team Members] Total sprint issues used: ${issues.length}`);
+        console.log(`[PMO Team Members] Sprint issue keys: [${sprintIssueKeys.join(', ')}]`);
+        console.log(`[PMO Team Members] ---`);
+        finalTeamMembers.forEach(member => {
+            const id = member.accountId || member.displayName;
+            const debugObj = teamMembersDebugLog[id] || { keys: [] };
+            console.log(`[PMO Team Members] ✓ ${member.displayName} | tickets: ${member.ticketCount} | SP: ${member.storyPoints} | keys: [${debugObj.keys.join(', ')}]`);
+        });
+        console.log(`[PMO Team Members] Final array length: ${finalTeamMembers.length}`);
+        console.log(`[PMO Team Members] ============================================`);
 
         const recentIssues = issues.slice(0, 10).map(i => ({
             key: i.key,
@@ -546,7 +580,7 @@ const getPMOSprintReport = async (req, res) => {
             statusDistribution,
             priorityDistribution,
             assigneeDistribution,
-            teamMembers,
+            teamMembers: finalTeamMembers,
             recentIssues
         };
 

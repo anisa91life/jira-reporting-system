@@ -353,23 +353,26 @@ const PMOReport = ({ data, projectKey, sprintId }) => {
           {data.teamMembers.length > 0 ? (
             <div className="team-grid">
               {data.teamMembers.map((member, idx) => (
-                <div key={idx} className="glass-card team-card-compact fade-in" style={{ animationDelay: `${0.5 + (idx * 0.05)}s` }}>
-                  {/* Avatar Section */}
-                  {member.avatarUrl ? (
-                    <img src={member.avatarUrl} alt={member.displayName} style={{ width: '48px', height: '48px', borderRadius: '50%', border: '2px solid rgba(139, 92, 246, 0.3)' }} />
-                  ) : (
-                    <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.2))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.2rem', color: '#a78bfa', border: '2px solid rgba(139, 92, 246, 0.3)' }}>
-                      {member.displayName.charAt(0)}
-                    </div>
-                  )}
-                  
-                  {/* Info Section */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{member.displayName}</span>
+                <div key={idx} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 14px',
+                  background: 'rgba(30, 41, 59, 0.5)',
+                  border: '1px solid var(--border-light)',
+                  borderRadius: 'var(--radius-sm)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {member.avatarUrl ? (
+                      <img src={member.avatarUrl} alt={member.displayName} style={{ width: '28px', height: '28px', borderRadius: '50%' }} />
+                    ) : (
+                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.8rem', color: '#60a5fa' }}>
+                        {member.displayName.charAt(0)}
+                      </div>
+                    )}
+                    <span style={{ fontWeight: 500, fontSize: '0.85rem', color: 'var(--text-primary)' }}>{member.displayName}</span>
                   </div>
-
-                  {/* Badge Section */}
-                  <div className="badge badge-active" style={{ fontSize: '0.8rem', padding: '4px 10px', background: 'rgba(139, 92, 246, 0.1)', color: '#a78bfa', width: 'fit-content' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-accent)' }}>
                     {member.storyPoints} SP
                   </div>
                 </div>
