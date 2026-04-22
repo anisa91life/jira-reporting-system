@@ -79,13 +79,13 @@ const calculateHealth = (metrics, sprintPhase, progressPercent) => {
 // Map health status to emoji and text
 const HEALTH_MAP = {
     NOT_STARTED: { emoji: '⏳', text: 'Not Started' },
-    MONITORING:  { emoji: '🔵', text: 'Monitoring' },
-    ON_TRACK:    { emoji: '🟢', text: 'On Track' },
-    WARNING:     { emoji: '🟡', text: 'Warning' },
-    AT_RISK:     { emoji: '🔴', text: 'At Risk' },
-    SUCCESS:     { emoji: '🟢', text: 'Completed Successfully' },
-    FAILED:      { emoji: '🔴', text: 'Completed — Low Reliability' },
-    UNKNOWN:     { emoji: '⚫', text: 'Unknown' },
+    MONITORING: { emoji: '🔵', text: 'Monitoring' },
+    ON_TRACK: { emoji: '🟢', text: 'On Track' },
+    WARNING: { emoji: '🟡', text: 'Warning' },
+    AT_RISK: { emoji: '🔴', text: 'At Risk' },
+    SUCCESS: { emoji: '🟢', text: 'Completed Successfully' },
+    FAILED: { emoji: '🔴', text: 'Completed — Low Reliability' },
+    UNKNOWN: { emoji: '⚫', text: 'Unknown' },
 };
 
 // --- Main Controller ---
@@ -173,19 +173,12 @@ const getPMOSprintReport = async (req, res) => {
 
         let rolloverIssueKeys = [];
         let cycleTimes = [];
-        let criticalBugsCreated = 0;
-        let criticalBugsResolved = 0;
+        let bugsCreated = 0;
+        let bugsResolved = 0;
+        let urgentBugsCount = 0;
         let blockedCount = 0;
         const assigneeWorkload = {};
-        const teamMembersMap = {};
-        const teamMembersDebugLog = {};
 
-        // Helper: exact sprint ID match in comma-separated changelog values
-        // Prevents substring false positives (e.g. sprintId "5" matching "15", "25", "50")
-        const sprintIdStr = String(sprintId);
-        const sprintIdRegex = new RegExp(`(?:^|,\\s*)${sprintIdStr}(?:\\s*,|$)`);
-        const matchesSprintId = (val) => sprintIdRegex.test(val);
-        
         // Standard aggregations
         let doneIssuesCount = 0;
         let notDoneIssuesCount = 0;
@@ -207,7 +200,7 @@ const getPMOSprintReport = async (req, res) => {
 
             const isDone = isEffectivelyDone(issue);
             const isLate = isLateStage(issue);
-            
+
             if (isDone) {
                 doneIssuesCount++;
             } else {
@@ -338,31 +331,30 @@ const getPMOSprintReport = async (req, res) => {
             }
 
             // Bugs
-            if (
-                issue.fields.issuetype?.name === 'Bug' &&
-                issue.fields.priority?.name &&
-                ['High', 'Highest', 'Critical', 'Urgent'].includes(issue.fields.priority.name)
-            ) {
-                const createdDate = new Date(issue.fields.created);
-                if (createdDate >= startDate && createdDate <= endDate) criticalBugsCreated++;
+            if (issue.fields.issuetype?.name === 'Bug') {
+                const priorityName = issue.fields.priority?.name;
+                const isUrgent = priorityName === 'High' || priorityName === 'Urgent';
 
-                if (isDone) {
-                    let resolvedDate = null;
-                    if (issue.changelog && issue.changelog.histories) {
-                        issue.changelog.histories.forEach(h => {
-                            h.items.forEach(item => {
-                                const toStatus = (item.toString || '').toLowerCase();
-                                if (item.field === 'status' &&
-                                    (toStatus.includes('done') || toStatus.includes('ready for release'))) {
-                                    resolvedDate = new Date(h.created);
-                                }
-                            });
-                        });
-                    }
-                    if (resolvedDate && resolvedDate >= startDate && resolvedDate <= endDate) {
-                        criticalBugsResolved++;
-                    }
+                // 1. All bugs in this loop belong to the selected sprint (via JQL `sprint = sprintId`)
+                // We count all of them, regardless of creation date.
+                bugsCreated++;
+
+                if (isUrgent) {
+                    urgentBugsCount++;
                 }
+
+                // 2. Completed bugs are determined by status logic
+                const statusName = (issue.fields.status?.name || '').toLowerCase().trim();
+                const notCompletedStatuses = ['to do', 'in progress', 'blocked'];
+
+                const isBugCompleted = !notCompletedStatuses.includes(statusName);
+
+                if (isBugCompleted) {
+                    bugsResolved++;
+                }
+
+                // Logging for Investigation
+                console.log(`[Investigation] Bug: ${issue.key}, Status: ${issue.fields.status?.name}, IsCompleted: ${isBugCompleted}, Sprint: ${sprintId}`);
             }
 
             // Blockers
@@ -455,7 +447,7 @@ const getPMOSprintReport = async (req, res) => {
         if (scopeChange > 20) decisions.push('Enforce scope freeze — no new issues should be added to the sprint.');
         if (avgCycleTime > 8) decisions.push('Run a workflow audit — cycle time is high. Check for review bottlenecks.');
         if (blockedCount > 3) decisions.push('Escalate blocked items — more than 3 issues have dependency blockers.');
-        if (criticalBugsCreated > 5) decisions.push('Schedule a dedicated bug-squashing session with the team.');
+        if (urgentBugsCount > 3) decisions.push('High number of urgent bugs detected, recommend dedicating time to bug fixes.');
 
         const getTrend = (val) => val > 0 ? '↑' : val < 0 ? '↓' : '→';
 
@@ -492,7 +484,7 @@ const getPMOSprintReport = async (req, res) => {
             assignee: i.fields.assignee?.displayName || 'Unassigned',
             priority: i.fields.priority?.name || 'None'
         }));
-        
+
         const completionPercentage = issues.length > 0 ? ((doneIssuesCount / issues.length) * 100).toFixed(1) : 0;
 
         const report = {
@@ -548,12 +540,12 @@ const getPMOSprintReport = async (req, res) => {
                     description: "Average time from 'In Progress' to 'Done' per issue."
                 },
                 {
-                    name: 'Critical Bugs',
-                    value: `${criticalBugsCreated}/${criticalBugsResolved}`,
-                    trend: criticalBugsCreated > criticalBugsResolved ? '↑' : '↓',
+                    name: 'Bugs',
+                    value: `${bugsCreated}/${bugsResolved}`,
+                    trend: bugsCreated > bugsResolved ? '↑' : '↓',
                     confidence: 'High',
-                    insight: 'Created vs Resolved during sprint',
-                    description: 'High-priority bugs created and resolved during this sprint.'
+                    insight: 'Total vs Completed during sprint',
+                    description: 'Total bugs in sprint vs completed bugs.'
                 },
                 {
                     name: 'Dependency Delays',
@@ -562,7 +554,7 @@ const getPMOSprintReport = async (req, res) => {
                     confidence: 'Low',
                     insight: blockedCount > 3 ? 'Multiple blockers — needs attention' : 'Under control',
                     description: 'Issues currently blocked by dependencies on other teams or work.'
-                }
+                },
             ],
             assigneeWorkload,
             rolloverCount: rolloverIssueKeys.length,
