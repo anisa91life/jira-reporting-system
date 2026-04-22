@@ -40,16 +40,6 @@ const getSprintHealthAnalysis = async (req, res) => {
             });
         }
 
-        // Get basic sprint report for status/assignee distribution
-        const sprintReport = await new Promise((resolve, reject) => {
-            const mockReq = { params: { projectKey, sprintId } };
-            const mockRes = {
-                json: (data) => resolve(data),
-                status: () => ({ json: () => resolve({}) })
-            };
-            jiraController.getSprintReport(mockReq, mockRes);
-        });
-
         // 2. Extract relevant metrics
         const metricsMap = {};
         if (pmoReport.metrics) {
@@ -75,9 +65,9 @@ const getSprintHealthAnalysis = async (req, res) => {
                 criticalBugsResolved: metricsMap['Critical Bugs'] ? parseInt(metricsMap['Critical Bugs'].split('/')[1]) || 0 : 0,
                 dependencyDelays: metricsMap['Dependency Delays'] || 0
             },
-            statusDistribution: sprintReport.statusDistribution || {},
+            statusDistribution: pmoReport.statusDistribution || {},
             assigneeWorkload: pmoReport.assigneeWorkload || {},
-            assigneeDistribution: sprintReport.assigneeDistribution || {}
+            assigneeDistribution: pmoReport.assigneeDistribution || {}
         };
 
         console.log("[AI] Source Metrics Extracted:", JSON.stringify(inputData, null, 2));

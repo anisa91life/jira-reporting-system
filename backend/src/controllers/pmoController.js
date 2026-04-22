@@ -179,6 +179,9 @@ const getPMOSprintReport = async (req, res) => {
         let blockedCount = 0;
         const assigneeWorkload = {};
 
+        const teamMembersMap = {};
+        const teamMembersDebugLog = {};
+
         // Standard aggregations
         let doneIssuesCount = 0;
         let notDoneIssuesCount = 0;
@@ -236,6 +239,11 @@ const getPMOSprintReport = async (req, res) => {
                             const fromVal = item.from ? String(item.from) : '';
 
                             // Use exact sprint ID matching (not substring)
+                            const matchesSprintId = (val) => {
+                                if (!val) return false;
+                                return val.split(',').map(s => s.trim()).includes(String(sprintId));
+                            };
+
                             if (matchesSprintId(toVal) && !addedDate) {
                                 addedDate = historyDate;
                                 addedToSprintViaChangelog = true;
