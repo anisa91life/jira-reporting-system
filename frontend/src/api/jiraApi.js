@@ -44,3 +44,8 @@ export const getAISprintHealth = async (projectKey, sprintId) => {
     const res = await api.post('/ai/sprint-health', { projectKey, sprintId });
     return res.data;
 };
+
+export const getAIReleaseHealth = async (releaseData) => {
+    const res = await api.post('/ai/release-health', releaseData);
+    return res.data;
+};

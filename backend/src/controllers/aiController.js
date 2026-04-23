@@ -87,6 +87,24 @@ const getSprintHealthAnalysis = async (req, res) => {
     }
 };
 
+const getReleaseHealthAnalysis = async (req, res) => {
+    try {
+        const releaseData = req.body;
+        if (!releaseData) {
+            return res.status(400).json({ error: "Release data is required in the request body" });
+        }
+        
+        console.log(`[AI] Generating health analysis for release...`);
+        const aiAnalysis = await aiAnalysisService.analyzeReleaseHealth(releaseData);
+        
+        res.json({ aiAnalysis });
+    } catch (error) {
+        console.error("Error in AI Release Health Analysis:", error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
 module.exports = {
-    getSprintHealthAnalysis
+    getSprintHealthAnalysis,
+    getReleaseHealthAnalysis
 };

@@ -87,6 +87,52 @@ const getTeamMembers = async (projectKey) => {
     }
 };
 
+const extractSprintIdsFromText = (rawValue) => {
+    if (!rawValue) return [];
+    const values = String(rawValue).split(',').map(v => v.trim()).filter(Boolean);
+    const sprintIds = new Set();
+
+    values.forEach((val) => {
+        if (/^\d+$/.test(val)) {
+            sprintIds.add(String(val));
+        }
+
+        const idMatches = val.match(/id=(\d+)/g) || [];
+        idMatches.forEach((m) => {
+            const id = m.split('=')[1];
+            if (id) sprintIds.add(String(id));
+        });
+    });
+
+    return Array.from(sprintIds);
+};
+
+const extractIssueSprintIds = (issue) => {
+    const sprintIds = new Set();
+
+    const fieldSprints = issue.fields?.customfield_10007;
+    if (Array.isArray(fieldSprints)) {
+        fieldSprints.forEach((s) => {
+            if (typeof s === 'number' || typeof s === 'string') {
+                extractSprintIdsFromText(s).forEach(id => sprintIds.add(id));
+            } else if (s && typeof s === 'object' && s.id) {
+                sprintIds.add(String(s.id));
+            }
+        });
+    }
+
+    const histories = issue.changelog?.histories || [];
+    histories.forEach((history) => {
+        (history.items || []).forEach((item) => {
+            if (item.field !== 'Sprint') return;
+            extractSprintIdsFromText(item.fromString).forEach(id => sprintIds.add(id));
+            extractSprintIdsFromText(item.toString).forEach(id => sprintIds.add(id));
+        });
+    });
+
+    return Array.from(sprintIds);
+};
+
 const getOverallReport = async (req, res) => {
     const { projectKey } = req.params;
     try {
@@ -223,6 +269,21 @@ const getProjectReleasesReport = async (req, res) => {
         const data = await jiraService.getIssuesWithChangelog(jql);
         const issues = data.issues || [];
 
+        const boardsRes = await jiraService.getBoardsByProject(projectKey);
+        const scrumBoards = (boardsRes?.values || []).filter(b => b.type === 'scrum');
+        const boardSprints = scrumBoards.length > 0
+            ? await jiraService.getBoardSprints(scrumBoards[0].id)
+            : [];
+        const sortedSprints = [...boardSprints].sort((a, b) => {
+            const aStart = new Date(a.startDate || 0).getTime();
+            const bStart = new Date(b.startDate || 0).getTime();
+            return aStart - bStart;
+        });
+        const sprintOrderMap = {};
+        sortedSprints.forEach((s, idx) => {
+            sprintOrderMap[String(s.id)] = idx;
+        });
+
         // Build release map
         const releases = versions.map(v => ({
             id: v.id,
@@ -249,8 +310,28 @@ const getProjectReleasesReport = async (req, res) => {
         const releaseMap = {};
         releases.forEach(r => releaseMap[r.id] = r);
 
+        const releaseSprintIdsMap = {};
+        releases.forEach((release) => {
+            const releaseStart = release.startDate ? new Date(release.startDate).getTime() : null;
+            const releaseEnd = release.releaseDate ? new Date(release.releaseDate).getTime() : Date.now();
+            const releaseSprintIds = sortedSprints
+                .filter((s) => {
+                    const sprintStart = s.startDate ? new Date(s.startDate).getTime() : null;
+                    const sprintEnd = s.completeDate
+                        ? new Date(s.completeDate).getTime()
+                        : s.endDate
+                            ? new Date(s.endDate).getTime()
+                            : sprintStart;
+                    if (!sprintStart || !sprintEnd || !releaseStart) return false;
+                    return sprintEnd >= releaseStart && sprintStart <= releaseEnd;
+                })
+                .map(s => String(s.id));
+            releaseSprintIdsMap[release.id] = releaseSprintIds;
+        });
+
         issues.forEach(issue => {
             const fixVersions = issue.fields.fixVersions || [];
+            const issueSprintIds = extractIssueSprintIds(issue);
             fixVersions.forEach(fv => {
                 const release = releaseMap[fv.id];
                 if (!release) return;
@@ -259,44 +340,35 @@ const getProjectReleasesReport = async (req, res) => {
                 const isFinished = statusCat === 'done';
                 const createdDate = new Date(issue.fields.created);
                 const startDate = release.startDate ? new Date(release.startDate) : null;
+                const releaseSprintIds = releaseSprintIdsMap[release.id] || [];
 
                 let addedAfterStart = false;
                 let wasInPreviousRelease = false;
 
-                if (issue.changelog && issue.changelog.histories) {
-                    issue.changelog.histories.forEach(history => {
-                        const historyDate = new Date(history.created);
-                        history.items.forEach(item => {
-                            if (item.field === 'Fix Version') {
-                                if (item.toString && item.toString.includes(fv.name)) {
-                                    if (startDate && historyDate > startDate) {
-                                        addedAfterStart = true;
-                                    }
-                                }
-                                if (item.fromString) {
-                                    wasInPreviousRelease = true;
-                                }
-                            }
-                        });
-                    });
-                }
+                const currentSprintIndexes = releaseSprintIds
+                    .map(id => sprintOrderMap[id])
+                    .filter(idx => Number.isInteger(idx));
+                const hasCurrentReleaseSprint = releaseSprintIds.some(id => issueSprintIds.includes(id));
+                const minCurrentSprintIndex = currentSprintIndexes.length ? Math.min(...currentSprintIndexes) : null;
+                const hasPreviousSprint = minCurrentSprintIndex !== null
+                    ? issueSprintIds.some(id => Number.isInteger(sprintOrderMap[id]) && sprintOrderMap[id] < minCurrentSprintIndex)
+                    : false;
+                const isSprintRollover = hasCurrentReleaseSprint && hasPreviousSprint;
 
                 if (startDate && createdDate > startDate && !addedAfterStart) {
                     addedAfterStart = true;
                 }
 
-                if (startDate && createdDate < startDate && !addedAfterStart) {
-                    wasInPreviousRelease = true;
-                }
+                wasInPreviousRelease = isSprintRollover;
 
                 let category = 'ongoing';
 
-                if (addedAfterStart) {
-                    category = 'addedDuring';
-                    release.metrics.addedDuringRelease++;
-                } else if (wasInPreviousRelease) {
+                if (wasInPreviousRelease) {
                     category = 'rolledOver';
                     release.metrics.rolledOverIssues++;
+                } else if (addedAfterStart) {
+                    category = 'addedDuring';
+                    release.metrics.addedDuringRelease++;
                 }
 
                 release.metrics.totalIssues++;
@@ -321,10 +393,30 @@ const getProjectReleasesReport = async (req, res) => {
                     addedToRelease: addedAfterStart ? 'After Start' : df
                 };
 
+                const now = new Date();
+                const releaseStart = release.startDate ? new Date(release.startDate) : null;
+                const releaseEnd = release.releaseDate ? new Date(release.releaseDate) : null;
+                const isCompletedRelease = Boolean(release.released) || Boolean(releaseEnd && releaseEnd < now);
+                const isInProgressRelease = Boolean(releaseStart && releaseStart <= now && (!releaseEnd || releaseEnd >= now));
+                const isPendingRelease = !isCompletedRelease && !isInProgressRelease;
+
                 if (category === 'rolledOver') release.issues.rolledOver.push(issueData);
                 else if (category === 'addedDuring') release.issues.addedDuring.push(issueData);
                 else if (!isFinished) release.issues.notCompleted.push(issueData);
                 else release.issues.completed.push(issueData);
+
+                // For pending releases, always populate completion tabs by status.
+                if (isPendingRelease) {
+                    if (isFinished) {
+                        if (!release.issues.completed.some(i => i.key === issueData.key)) {
+                            release.issues.completed.push(issueData);
+                        }
+                    } else {
+                        if (!release.issues.notCompleted.some(i => i.key === issueData.key)) {
+                            release.issues.notCompleted.push(issueData);
+                        }
+                    }
+                }
             });
         });
 
