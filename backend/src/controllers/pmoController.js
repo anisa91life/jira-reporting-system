@@ -485,13 +485,7 @@ const getPMOSprintReport = async (req, res) => {
         console.log(`[PMO Team Members] Final array length: ${finalTeamMembers.length}`);
         console.log(`[PMO Team Members] ============================================`);
 
-        const recentIssues = issues.slice(0, 10).map(i => ({
-            key: i.key,
-            summary: i.fields.summary,
-            status: i.fields.status?.name || 'Unknown',
-            assignee: i.fields.assignee?.displayName || 'Unassigned',
-            priority: i.fields.priority?.name || 'None'
-        }));
+
 
         const completionPercentage = issues.length > 0 ? ((doneIssuesCount / issues.length) * 100).toFixed(1) : 0;
 
@@ -588,8 +582,7 @@ const getPMOSprintReport = async (req, res) => {
             statusDistribution,
             priorityDistribution,
             assigneeDistribution,
-            teamMembers: finalTeamMembers,
-            recentIssues
+            teamMembers: finalTeamMembers
         };
 
         res.json(report);
