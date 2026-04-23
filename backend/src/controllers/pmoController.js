@@ -8,18 +8,26 @@ const diffDays = (d1, d2) => {
 
 // --- Status Classification ---
 
-const DONE_EQUIVALENT_STATUSES = new Set([
-    'done', 'closed', 'released', 'ready for release', 'ready for prod', 'ready for production'
-]);
+const PROJECT_COMPLETION_MAP = {
+    AIE: new Set(['code review', 'ready for stage', 'ready for qa', 'in qa', 'ready for prod', 'done']),
+    HAR: new Set(['ready for code review', 'in review', 'code review', 'ready for qa', 'in qa', 'ready for uat', 'done']),
+    HP: new Set(['ready for code review', 'code review', 'ready for qa', 'in qa', 'ready for uat', 'in uat', 'ready for release', 'done'])
+};
+
+const DEFAULT_COMPLETION_STATUSES = new Set(['done']);
 
 const LATE_STAGE_STATUSES = new Set([
     'code review', 'ready for qa', 'qa review', 'staging', 'ready for stage', 'ready for staging'
 ]);
 
-const isEffectivelyDone = (issue) => {
-    const statusCategoryKey = issue.fields.status?.statusCategory?.key;
+const isEffectivelyDone = (issue, projectKey) => {
     const statusName = (issue.fields.status?.name || '').toLowerCase().trim();
-    return statusCategoryKey === 'done' || DONE_EQUIVALENT_STATUSES.has(statusName);
+
+    if (projectKey && PROJECT_COMPLETION_MAP[projectKey.toUpperCase()]) {
+        return PROJECT_COMPLETION_MAP[projectKey.toUpperCase()].has(statusName);
+    }
+
+    return DEFAULT_COMPLETION_STATUSES.has(statusName);
 };
 
 const isLateStage = (issue) => {
@@ -51,17 +59,18 @@ const calculateHealth = (metrics, sprintPhase, progressPercent) => {
     if (sprintPhase === 'future') return 'NOT_STARTED';
 
     if (sprintPhase === 'active') {
-        if (progressPercent < 30) return 'MONITORING';
+        if (progressPercent < 20) return 'MONITORING';
 
         if (
-            metrics.commitmentReliability < 60 ||
-            metrics.scopeChange > 30 ||
-            metrics.unplannedWork > 30
+            metrics.commitmentReliability < 50 ||
+            metrics.scopeChange > 20 ||
+            metrics.unplannedWork > 25
         ) return 'AT_RISK';
 
         if (
-            metrics.commitmentReliability >= 60 &&
-            metrics.scopeChange <= 20
+            metrics.commitmentReliability >= 75 &&
+            metrics.scopeChange <= 10 &&
+            metrics.unplannedWork <= 15
         ) return 'ON_TRACK';
 
         return 'WARNING';
@@ -76,16 +85,48 @@ const calculateHealth = (metrics, sprintPhase, progressPercent) => {
     return 'UNKNOWN';
 };
 
-// Map health status to emoji and text
+// Map health status to emoji, text and tooltip explanation
 const HEALTH_MAP = {
-    NOT_STARTED: { emoji: '⏳', text: 'Not Started' },
-    MONITORING: { emoji: '🔵', text: 'Monitoring' },
-    ON_TRACK: { emoji: '🟢', text: 'On Track' },
-    WARNING: { emoji: '🟡', text: 'Warning' },
-    AT_RISK: { emoji: '🔴', text: 'At Risk' },
-    SUCCESS: { emoji: '🟢', text: 'Completed Successfully' },
-    FAILED: { emoji: '🔴', text: 'Completed — Low Reliability' },
-    UNKNOWN: { emoji: '⚫', text: 'Unknown' },
+    NOT_STARTED: {
+        emoji: '⏳',
+        text: 'Not Started',
+        tooltip: 'Sprint has not started yet.'
+    },
+    MONITORING: {
+        emoji: '🔵',
+        text: 'Monitoring',
+        tooltip: 'Monitoring: Too early in the sprint to evaluate performance.'
+    },
+    ON_TRACK: {
+        emoji: '🟢',
+        text: 'On Track',
+        tooltip: 'On Track: High delivery (75%+), low scope change (≤10%), and minimal unplanned work.'
+    },
+    WARNING: {
+        emoji: '🟡',
+        text: 'Warning',
+        tooltip: 'Warning: Some deviation in delivery or scope. Monitor closely.'
+    },
+    AT_RISK: {
+        emoji: '🔴',
+        text: 'At Risk',
+        tooltip: 'At Risk: Critical low delivery (<50%) or high scope/unplanned work.'
+    },
+    SUCCESS: {
+        emoji: '🟢',
+        text: 'Completed Successfully',
+        tooltip: 'Success: Sprint completed with 80%+ commitment reliability.'
+    },
+    FAILED: {
+        emoji: '🔴',
+        text: 'Completed — Low Reliability',
+        tooltip: 'Failed: Sprint completed with less than 60% reliability.'
+    },
+    UNKNOWN: {
+        emoji: '⚫',
+        text: 'Unknown',
+        tooltip: 'Status unknown.'
+    },
 };
 
 // --- Main Controller ---
@@ -169,18 +210,20 @@ const getPMOSprintReport = async (req, res) => {
 
         // FIX #2/#3: Scope change and unplanned work using issue.fields.created vs sprint.startDate
         let scopeAddedPoints = 0;   // Issues CREATED after sprint start (true new scope)
-        let scopeAddedKeys = [];
-
-        let rolloverIssueKeys = [];
-        let cycleTimes = [];
-        let bugsCreated = 0;
-        let bugsResolved = 0;
-        let urgentBugsCount = 0;
-        let blockedCount = 0;
+        const unplannedDeliveredIssues = [];
+        const scopeAddedKeys = [];
+        const rolloverIssueKeys = [];
+        const cycleTimes = [];
         const assigneeWorkload = {};
 
         const teamMembersMap = {};
         const teamMembersDebugLog = {};
+
+        // Trackers
+        let bugsCreated = 0;
+        let bugsResolved = 0;
+        let urgentBugsCount = 0;
+        let blockedCount = 0;
 
         // Standard aggregations
         let doneIssuesCount = 0;
@@ -201,7 +244,7 @@ const getPMOSprintReport = async (req, res) => {
             const pts10004 = parseFloat(issue.fields['customfield_10004']) || 0;
             const points = pts10004 || pts11224 || 0;
 
-            const isDone = isEffectivelyDone(issue);
+            const isDone = isEffectivelyDone(issue, projectKey);
             const isLate = isLateStage(issue);
 
             if (isDone) {
@@ -267,7 +310,7 @@ const getPMOSprintReport = async (req, res) => {
             if (issue.fields.assignee) {
                 const assignee = issue.fields.assignee;
                 const id = assignee.accountId || assignee.displayName;
-                
+
                 if (!teamMembersMap[id]) {
                     teamMembersMap[id] = {
                         accountId: assignee.accountId || '',
@@ -291,10 +334,17 @@ const getPMOSprintReport = async (req, res) => {
                 committedPoints += points;
                 if (isDone) deliveredPoints += points;
             } else {
-                // FIX #2/#3: True scope addition and unplanned work
+                // Added scope = created AFTER sprint start
                 scopeAddedPoints += points;
                 scopeAddedKeys.push(issue.key);
-                if (isDone) unplannedDeliveredPoints += points;
+                if (isDone) {
+                    unplannedDeliveredPoints += points;
+                    unplannedDeliveredIssues.push({
+                        key: issue.key,
+                        summary: issue.fields.summary,
+                        points: points
+                    });
+                }
             }
 
             // Handle removed issues
@@ -497,6 +547,7 @@ const getPMOSprintReport = async (req, res) => {
                 healthText: healthInfo.text,
                 healthStatus,
                 mainRisk,
+                tooltip: healthInfo.tooltip,
                 focusNext: isEarlyPhase
                     ? 'Complete initial committed items'
                     : commitmentReliability < 80
@@ -531,7 +582,8 @@ const getPMOSprintReport = async (req, res) => {
                     trend: '↓',
                     confidence: isEarlyPhase ? 'Low' : 'High',
                     insight: isEarlyPhase ? 'Not reliable yet — check mid-sprint' : unplannedWork > 20 ? 'High ratio of unplanned completed work' : 'Manageable level',
-                    description: 'Story points of unplanned issues (created during sprint) that were delivered, as a % of total delivered.'
+                    description: 'Story points of unplanned issues (created during sprint) that were delivered, as a % of total delivered.',
+                    details: unplannedDeliveredIssues
                 },
                 {
                     name: 'Cycle Time',

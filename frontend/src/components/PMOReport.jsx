@@ -189,16 +189,19 @@ const PMOReport = ({ data, projectKey, sprintId }) => {
             <h2 style={{ fontSize: '1.5rem', marginBottom: '8px' }}>Executive Summary</h2>
             <p style={{ color: 'var(--text-secondary)', maxWidth: '600px' }}>{summary.summaryText}</p>
           </div>
-          <div className="pmo-health-indicator">
-            <span className="pmo-health-circle">{summary.health}</span>
-            <span className="pmo-health-text" style={{
-              color: summary.health === '🔴' ? 'var(--accent-danger)' :
-                summary.health === '🟡' ? 'var(--accent-warning)' :
-                  summary.health === '🔵' ? 'var(--text-accent)' :
-                    'var(--accent-success)'
-            }}>
-              {summary.healthText}
-            </span>
+          <div className="pmo-health-indicator" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="pmo-health-circle">{summary.health}</span>
+              <span className="pmo-health-text" style={{
+                color: summary.health === '🔴' ? 'var(--accent-danger)' :
+                  summary.health === '🟡' ? 'var(--accent-warning)' :
+                    summary.health === '🔵' ? 'var(--text-accent)' :
+                      'var(--accent-success)'
+              }}>
+                {summary.healthText}
+              </span>
+            </div>
+            {summary.tooltip && <InfoTooltip text={summary.tooltip} />}
           </div>
         </div>
 
@@ -246,7 +249,11 @@ const PMOReport = ({ data, projectKey, sprintId }) => {
             <div className="pmo-metric-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span>{metric.name}</span>
-                <InfoTooltip text={metric.description} />
+                <InfoTooltip 
+                  text={metric.description} 
+                  details={metric.details}
+                  type={metric.name === 'Unplanned Work' ? 'popover' : 'tooltip'}
+                />
               </div>
               <span style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>
                 {metric.confidence}
