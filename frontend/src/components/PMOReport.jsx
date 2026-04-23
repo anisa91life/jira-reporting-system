@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { AlertCircle, CheckCircle, TrendingUp, TrendingDown, Clock, Bug, Shield, ArrowRight, CornerDownRight, Calendar, Info, Cpu, Loader, Layers, Activity, ActivitySquare, Users } from 'lucide-react';
 import { CommitmentChart, BugTrendChart, WorkDistributionChart } from './PMOCharts';
 import { StatusPieChart, PriorityPieChart } from './Charts';
-import DataTable from './DataTable';
 import ReportCard from './ReportCard';
 import InfoTooltip from './InfoTooltip';
 import { getAISprintHealth } from '../api/jiraApi';
@@ -336,13 +335,6 @@ const PMOReport = ({ data, projectKey, sprintId }) => {
               <PriorityPieChart data={data.priorityDistribution || {}} />
             </div>
           </div>
-        </div>
-      )}
-
-      {/* 6. Recent Data Table */}
-      {data.recentIssues && (
-        <div className="fade-in" style={{ animationDelay: '0.4s', marginTop: '32px' }}>
-          <DataTable issues={data.recentIssues} />
         </div>
       )}
 
