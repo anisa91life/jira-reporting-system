@@ -1,10 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import { Layers, Activity, CheckCircle, RotateCcw, PlusCircle, ArrowLeft, XCircle, TrendingUp } from 'lucide-react';
+import { getAIReleaseHealth } from '../api/jiraApi';
+
 
 const ReleaseReport = ({ data, projectKey }) => {
     const [selectedReleaseId, setSelectedReleaseId] = useState(null);
     const [activeTab, setActiveTab] = useState('rolledOver'); // rolledOver, addedDuring, notCompleted, completed
     const [showAllReleases, setShowAllReleases] = useState(false);
+    const [aiAnalysis, setAiAnalysis] = useState(null);
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiError, setAiError] = useState(null);
+
 
     // Data passed should be `{ releases: [...] }`
     const releases = data?.releases || [];
@@ -56,6 +62,21 @@ const ReleaseReport = ({ data, projectKey }) => {
             return { bg: 'rgba(59, 130, 246, 0.15)', text: '#3B82F6' };
         }
         return { bg: 'rgba(245, 158, 11, 0.15)', text: '#F59E0B' }; // to do style
+    };
+
+    const handleGenerateAIOverview = async () => {
+        if (!selectedRelease) return;
+        setAiLoading(true);
+        setAiError(null);
+        try {
+            const result = await getAIReleaseHealth(selectedRelease);
+            setAiAnalysis(result.aiAnalysis);
+        } catch (err) {
+            console.error("Failed to generate AI overview:", err);
+            setAiError("Failed to load AI overview. Please check server logs.");
+        } finally {
+            setAiLoading(false);
+        }
     };
 
     return (
@@ -158,6 +179,8 @@ const ReleaseReport = ({ data, projectKey }) => {
                                 onClick={() => {
                                     setSelectedReleaseId(release.id);
                                     setActiveTab('rolledOver');
+                                    setAiAnalysis(null);
+                                    setAiError(null);
                                 }}
                             >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -259,18 +282,57 @@ const ReleaseReport = ({ data, projectKey }) => {
                     ) : (
                         <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                             {/* Drill header */}
-                            <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <div>
+                                    <button
+                                        className="btn-invisible"
+                                        style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', marginBottom: '16px', fontWeight: 600, padding: 0 }}
+                                        onClick={() => {
+                                            setSelectedReleaseId(null);
+                                            setAiAnalysis(null);
+                                            setAiError(null);
+                                        }}
+                                    >
+                                        <ArrowLeft size={16} /> Back to Releases
+                                    </button>
+                                    <h2 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '8px', color: 'var(--text-primary)' }}>{selectedRelease.name}</h2>
+                                    <p style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}>{selectedRelease.description}</p>
+                                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{formatDate(selectedRelease.startDate)} — {formatDate(selectedRelease.releaseDate)}</p>
+                                </div>
                                 <button
-                                    className="btn-invisible"
-                                    style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', marginBottom: '16px', fontWeight: 600, padding: 0 }}
-                                    onClick={() => setSelectedReleaseId(null)}
+                                    onClick={handleGenerateAIOverview}
+                                    disabled={aiLoading}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '8px',
+                                        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                                        color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '8px',
+                                        fontWeight: 600, cursor: aiLoading ? 'not-allowed' : 'pointer',
+                                        opacity: aiLoading ? 0.7 : 1, transition: 'all 0.2s',
+                                        boxShadow: '0 4px 12px rgba(99,102,241,0.3)'
+                                    }}
                                 >
-                                    <ArrowLeft size={16} /> Back to Releases
+                                    <Activity size={18} />
+                                    {aiLoading ? 'Generating...' : 'Release Health AI Overview'}
                                 </button>
-                                <h2 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '8px', color: 'var(--text-primary)' }}>{selectedRelease.name}</h2>
-                                <p style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}>{selectedRelease.description}</p>
-                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{formatDate(selectedRelease.startDate)} — {formatDate(selectedRelease.releaseDate)}</p>
                             </div>
+
+                            {/* AI Analysis View */}
+                            {aiError && (
+                                <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '16px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                                    {aiError}
+                                </div>
+                            )}
+
+                            {aiAnalysis && (
+                                <div className="glass-panel fade-in" style={{ padding: '24px', background: 'linear-gradient(to right, rgba(99, 102, 241, 0.05), rgba(139, 92, 246, 0.05))', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+                                    <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                                        <Activity size={20} color="#8b5cf6" /> AI Release Health Overview
+                                    </h3>
+                                    <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
+                                        {aiAnalysis}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Drill Metrics */}
                             <div style={{ display: 'flex', gap: '16px' }}>

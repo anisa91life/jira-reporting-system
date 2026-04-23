@@ -22,5 +22,6 @@ router.get('/reports/pmo-sprint/:projectKey/:sprintId', pmoController.getPMOSpri
 
 // AI Analysis Routes
 router.post('/ai/sprint-health', aiController.getSprintHealthAnalysis);
+router.post('/ai/release-health', aiController.getReleaseHealthAnalysis);
 
 module.exports = router;

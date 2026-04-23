@@ -228,6 +228,71 @@ const getFallbackResponse = () => ({
     confidence: "low — Analysis failed to complete."
 });
 
+const analyzeReleaseHealth = async (data) => {
+    try {
+        if (!process.env.GROQ_API_KEY) {
+            throw new Error("GROQ_API_KEY is not defined in .env");
+        }
+
+        const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+        const prompt = `You are a Release Overview AI.
+
+Analyze Jira release data and provide a short, clear status update.
+
+Rules:
+- Be concise and factual
+- Focus only on progress and risk
+- Do not explain Agile concepts
+
+Logic:
+- If release_date is in the past -> treat as Completed
+- Otherwise -> treat as In Progress
+
+Calculations:
+- Done % = Done / Total
+- In Progress % = (In Progress + Ready for Code Review + Code Review + Ready for QA) / Total
+- Not Started % = To Do / Total
+
+Status mapping rule:
+- Treat status " Pending" as Completed/Done (count it in Done %)
+
+Input Data:
+${JSON.stringify(data, null, 2)}
+
+Output:
+
+If Completed:
+Release {name} - Completed
+{Done %}% delivered. {rolled_over} tickets rolled over.
+Short summary of delivery stability.
+
+If In Progress:
+Release {name} - In Progress
+{Done % + In Progress %}% completed or in development, {Not Started %}% not started.
+Status: 🟢 On Track / 🟡 At Risk / 🔴 Delayed (based on progress).
+Biggest concern: one short sentence.
+
+Formatting constraints:
+- Return plain text only (no markdown headings, no bullet points)
+- Keep it brief (4 lines max)
+- Use integer percentages unless decimals are needed for clarity`;
+
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [{ role: "user", content: prompt }],
+            model: "llama-3.3-70b-versatile",
+            temperature: 0.5
+        });
+
+        const responseText = chatCompletion.choices[0].message.content;
+        return responseText;
+    } catch (error) {
+        console.error("Error communicating with Groq API for release health:", error);
+        return "🧠 Release Summary\n\nError analyzing release health. Please check server logs.";
+    }
+};
+
 module.exports = {
-    analyzeSprintHealth
+    analyzeSprintHealth,
+    analyzeReleaseHealth
 };
