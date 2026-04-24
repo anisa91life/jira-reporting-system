@@ -81,8 +81,19 @@ const ReleaseReport = ({ data, projectKey }) => {
         if (!selectedRelease) return;
         setAiLoading(true);
         setAiError(null);
+
+        // Determine phase for AI context
+        const now = new Date();
+        const start = new Date(selectedRelease.startDate);
+        let phase = 'future';
+        if (selectedRelease.released) phase = 'completed';
+        else if (start <= now) phase = 'active';
+
         try {
-            const result = await getAIReleaseHealth(selectedRelease);
+            const result = await getAIReleaseHealth({
+                ...selectedRelease,
+                phase
+            });
             setAiAnalysis(result.aiAnalysis);
         } catch (err) {
             console.error("Failed to generate AI overview:", err);

@@ -236,47 +236,48 @@ const analyzeReleaseHealth = async (data) => {
 
         const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-        const prompt = `You are a Release Overview AI.
+        const prompt = `You are a Senior PMO Delivery AI.
+Analyze the provided Jira Release data and provide a concise, high-level health overview.
 
-Analyze Jira release data and provide a short, clear status update.
+CONTEXT:
+Release Phase: ${data.phase || 'Unknown'} (Future/Active/Completed)
+Metrics provided are calculated using project-specific completion logic (AIE/HAR/HP mappings).
 
-Rules:
-- Be concise and factual
-- Focus only on progress and risk
-- Do not explain Agile concepts
+DATA:
+- Total Issues: ${data.metrics.totalIssues}
+- Completed: ${data.metrics.completedIssues}
+- Not Completed: ${data.metrics.notCompletedIssues}
+- Rolled Over: ${data.metrics.rolledOverIssues}
+- Added After Start: ${data.metrics.addedDuringRelease}
 
-Logic:
-- If release_date is in the past -> treat as Completed
-- Otherwise -> treat as In Progress
+RULES:
+1. PHASE-AWARENESS:
+   - FUTURE: Focus on planned scope and initial commitments. Use neutral, preparatory language.
+   - ACTIVE: Focus on execution progress, remaining work, and scope change risks. Use dynamic, tracking language.
+   - COMPLETED: Focus on delivery performance, what was missed, and overall stability. Use reflective, final language.
 
-Calculations:
-- Done % = Done / Total
-- In Progress % = (In Progress + Ready for Code Review + Code Review + Ready for QA) / Total
-- Not Started % = To Do / Total
+2. LOGIC:
+   - Use the provided counts directly. Do NOT recalculate percentages from issue lists.
+   - Completion Rate = (Completed / Total) * 100.
+   - Roll-over Rate = (Rolled Over / Total) * 100.
+   - Scope Change = (Added After Start / Total) * 100.
 
-Status mapping rule:
-- Treat status " Pending" as Completed/Done (count it in Done %)
+3. STATUS MAPPING:
+   - Trust the metrics provided. "isFinished" has already been determined by the backend for all issues.
 
-Input Data:
-${JSON.stringify(data, null, 2)}
+4. TONE:
+   - Professional PMO tone. Concise and factual.
+   - Max 4 lines.
+   - Plain text only.
 
-Output:
+5. OUTPUT TEMPLATE:
+   - Line 1: [Phase Emoji] {Release Name} - {Phase} Status: {Health Color: Green/Yellow/Red}
+   - Line 2: Completion: {Completion Rate}% | Roll-over: {Roll-over Rate}% | Scope Change: {Scope Change}%
+   - Line 3: {One sentence on main trend or risk}
+   - Line 4: {One recommended action item}
 
-If Completed:
-Release {name} - Completed
-{Done %}% delivered. {rolled_over} tickets rolled over.
-Short summary of delivery stability.
-
-If In Progress:
-Release {name} - In Progress
-{Done % + In Progress %}% completed or in development, {Not Started %}% not started.
-Status: 🟢 On Track / 🟡 At Risk / 🔴 Delayed (based on progress).
-Biggest concern: one short sentence.
-
-Formatting constraints:
-- Return plain text only (no markdown headings, no bullet points)
-- Keep it brief (4 lines max)
-- Use integer percentages unless decimals are needed for clarity`;
+INPUT JSON:
+${JSON.stringify(data, null, 2)}`;
 
         const chatCompletion = await groq.chat.completions.create({
             messages: [{ role: "user", content: prompt }],
