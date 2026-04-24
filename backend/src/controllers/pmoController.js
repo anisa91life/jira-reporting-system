@@ -1,38 +1,10 @@
 const jiraService = require('../services/jiraService');
+const { isEffectivelyDone, isLateStage } = require('../utils/jiraUtils');
 
 // Helper: calculate absolute days between two dates
 const diffDays = (d1, d2) => {
     const timeDiff = Math.abs(new Date(d2).getTime() - new Date(d1).getTime());
     return Math.ceil(timeDiff / (1000 * 3600 * 24));
-};
-
-// --- Status Classification ---
-
-const PROJECT_COMPLETION_MAP = {
-    AIE: new Set(['code review', 'ready for stage', 'ready for qa', 'in qa', 'ready for prod', 'done']),
-    HAR: new Set(['ready for code review', 'in review', 'code review', 'ready for qa', 'in qa', 'ready for uat', 'done']),
-    HP: new Set(['ready for code review', 'code review', 'ready for qa', 'in qa', 'ready for uat', 'in uat', 'ready for release', 'done'])
-};
-
-const DEFAULT_COMPLETION_STATUSES = new Set(['done']);
-
-const LATE_STAGE_STATUSES = new Set([
-    'code review', 'ready for qa', 'qa review', 'staging', 'ready for stage', 'ready for staging'
-]);
-
-const isEffectivelyDone = (issue, projectKey) => {
-    const statusName = (issue.fields.status?.name || '').toLowerCase().trim();
-
-    if (projectKey && PROJECT_COMPLETION_MAP[projectKey.toUpperCase()]) {
-        return PROJECT_COMPLETION_MAP[projectKey.toUpperCase()].has(statusName);
-    }
-
-    return DEFAULT_COMPLETION_STATUSES.has(statusName);
-};
-
-const isLateStage = (issue) => {
-    const statusName = (issue.fields.status?.name || '').toLowerCase().trim();
-    return LATE_STAGE_STATUSES.has(statusName);
 };
 
 // --- Sprint Phase Detection ---

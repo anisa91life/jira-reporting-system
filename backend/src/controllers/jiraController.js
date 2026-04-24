@@ -1,4 +1,5 @@
 const jiraService = require('../services/jiraService');
+const { isEffectivelyDone } = require('../utils/jiraUtils');
 
 const getProjects = async (req, res) => {
     try {
@@ -269,101 +270,99 @@ const getProjectReleasesReport = async (req, res) => {
         const data = await jiraService.getIssuesWithChangelog(jql);
         const issues = data.issues || [];
 
-        const boardsRes = await jiraService.getBoardsByProject(projectKey);
-        const scrumBoards = (boardsRes?.values || []).filter(b => b.type === 'scrum');
-        const boardSprints = scrumBoards.length > 0
-            ? await jiraService.getBoardSprints(scrumBoards[0].id)
-            : [];
-        const sortedSprints = [...boardSprints].sort((a, b) => {
-            const aStart = new Date(a.startDate || 0).getTime();
-            const bStart = new Date(b.startDate || 0).getTime();
-            return aStart - bStart;
-        });
-        const sprintOrderMap = {};
-        sortedSprints.forEach((s, idx) => {
-            sprintOrderMap[String(s.id)] = idx;
-        });
+        // Build release map and date lookup
+        const versionDateMap = {};
+        const releases = versions.map(v => {
+            const vDate = v.startDate || v.releaseDate || '0';
+            versionDateMap[v.id] = new Date(vDate).getTime();
 
-        // Build release map
-        const releases = versions.map(v => ({
-            id: v.id,
-            name: v.name,
-            description: v.description || '',
-            startDate: v.startDate,
-            releaseDate: v.releaseDate,
-            released: v.released,
-            metrics: {
-                totalIssues: 0,
-                completedIssues: 0,
-                rolledOverIssues: 0,
-                addedDuringRelease: 0,
-                notCompletedIssues: 0,
-            },
-            issues: {
-                rolledOver: [],
-                addedDuring: [],
-                notCompleted: [],
-                completed: []
-            }
-        })).sort((a, b) => new Date(b.startDate || 0) - new Date(a.startDate || 0));
+            return {
+                id: v.id,
+                name: v.name,
+                description: v.description || '',
+                startDate: v.startDate,
+                releaseDate: v.releaseDate,
+                released: v.released,
+                metrics: {
+                    totalIssues: 0,
+                    completedIssues: 0,
+                    rolledOverIssues: 0,
+                    addedDuringRelease: 0,
+                    notCompletedIssues: 0,
+                },
+                issues: {
+                    rolledOver: [],
+                    addedDuring: [],
+                    notCompleted: [],
+                    completed: []
+                }
+            };
+        }).sort((a, b) => {
+            const dateA = new Date(a.releaseDate || a.startDate || '1970-01-01').getTime();
+            const dateB = new Date(b.releaseDate || b.startDate || '1970-01-01').getTime();
+            return dateB - dateA; // Descending (newest first)
+        });
 
         const releaseMap = {};
         releases.forEach(r => releaseMap[r.id] = r);
 
-        const releaseSprintIdsMap = {};
-        releases.forEach((release) => {
-            const releaseStart = release.startDate ? new Date(release.startDate).getTime() : null;
-            const releaseEnd = release.releaseDate ? new Date(release.releaseDate).getTime() : Date.now();
-            const releaseSprintIds = sortedSprints
-                .filter((s) => {
-                    const sprintStart = s.startDate ? new Date(s.startDate).getTime() : null;
-                    const sprintEnd = s.completeDate
-                        ? new Date(s.completeDate).getTime()
-                        : s.endDate
-                            ? new Date(s.endDate).getTime()
-                            : sprintStart;
-                    if (!sprintStart || !sprintEnd || !releaseStart) return false;
-                    return sprintEnd >= releaseStart && sprintStart <= releaseEnd;
-                })
-                .map(s => String(s.id));
-            releaseSprintIdsMap[release.id] = releaseSprintIds;
-        });
-
         issues.forEach(issue => {
             const fixVersions = issue.fields.fixVersions || [];
-            const issueSprintIds = extractIssueSprintIds(issue);
+            
+            // 1. Extract Fix Version History from Changelog
+            const previousVersionNames = new Set();
+            if (issue.changelog && issue.changelog.histories) {
+                issue.changelog.histories.forEach(history => {
+                    history.items.forEach(item => {
+                        if (item.field === 'Fix Version' && item.fromString) {
+                            // Collect names of previous versions. 
+                            // Note: item.from is the ID, but item.fromString is often more reliable
+                            const names = item.fromString.split(',').map(v => v.trim());
+                            names.forEach(name => previousVersionNames.add(name));
+                        }
+                    });
+                });
+            }
+
             fixVersions.forEach(fv => {
                 const release = releaseMap[fv.id];
                 if (!release) return;
 
-                const statusCat = issue.fields.status?.statusCategory?.key || '';
-                const isFinished = statusCat === 'done';
+                const isFinished = isEffectivelyDone(issue, projectKey);
                 const createdDate = new Date(issue.fields.created);
-                const startDate = release.startDate ? new Date(release.startDate) : null;
-                const releaseSprintIds = releaseSprintIdsMap[release.id] || [];
-
+                const currentReleaseStart = release.startDate ? new Date(release.startDate).getTime() : 0;
+                
+                let isReleaseRollover = false;
                 let addedAfterStart = false;
-                let wasInPreviousRelease = false;
 
-                const currentSprintIndexes = releaseSprintIds
-                    .map(id => sprintOrderMap[id])
-                    .filter(idx => Number.isInteger(idx));
-                const hasCurrentReleaseSprint = releaseSprintIds.some(id => issueSprintIds.includes(id));
-                const minCurrentSprintIndex = currentSprintIndexes.length ? Math.min(...currentSprintIndexes) : null;
-                const hasPreviousSprint = minCurrentSprintIndex !== null
-                    ? issueSprintIds.some(id => Number.isInteger(sprintOrderMap[id]) && sprintOrderMap[id] < minCurrentSprintIndex)
-                    : false;
-                const isSprintRollover = hasCurrentReleaseSprint && hasPreviousSprint;
+                // 2. Logic: Explicit Movement from EARLIER Release
+                // Match names from history back to the actual version objects to compare dates
+                if (previousVersionNames.size > 0) {
+                    previousVersionNames.forEach(prevName => {
+                        const prevVer = versions.find(v => v.name === prevName);
+                        if (prevVer && prevVer.id !== fv.id) {
+                            const prevDate = versionDateMap[prevVer.id] || 0;
+                            const currentTargetDate = versionDateMap[fv.id] || 0;
+                            
+                            // If it came from a release that was scheduled earlier
+                            if (prevDate > 0 && currentTargetDate > 0 && prevDate < currentTargetDate) {
+                                isReleaseRollover = true;
+                            }
+                        }
+                    });
+                }
 
-                if (startDate && createdDate > startDate && !addedAfterStart) {
+                // 3. Logic: Scope Addition (Added after start)
+                if (currentReleaseStart > 0 && createdDate.getTime() > currentReleaseStart) {
                     addedAfterStart = true;
                 }
 
-                wasInPreviousRelease = isSprintRollover;
+                // 4. Fallback Handling
+                // Issues created before start but with NO version history are "initial scope", NOT rollover
+                // This is implicitly handled because isReleaseRollover defaults to false unless explicit movement is found.
 
                 let category = 'ongoing';
-
-                if (wasInPreviousRelease) {
+                if (isReleaseRollover) {
                     category = 'rolledOver';
                     release.metrics.rolledOverIssues++;
                 } else if (addedAfterStart) {
@@ -381,23 +380,19 @@ const getProjectReleasesReport = async (req, res) => {
                     if (category !== 'addedDuring' && category !== 'rolledOver') category = 'notCompleted';
                 }
 
-                const d = new Date(issue.fields.created);
-                const df = d.toLocaleDateString();
-
                 const issueData = {
                     key: issue.key,
                     title: issue.fields.summary,
                     status: issue.fields.status?.name || 'Unknown',
                     assignee: issue.fields.assignee?.displayName || 'Unassigned',
                     priority: issue.fields.priority?.name || 'None',
-                    addedToRelease: addedAfterStart ? 'After Start' : df
+                    addedToRelease: addedAfterStart ? 'After Start' : createdDate.toLocaleDateString()
                 };
 
                 const now = new Date();
-                const releaseStart = release.startDate ? new Date(release.startDate) : null;
                 const releaseEnd = release.releaseDate ? new Date(release.releaseDate) : null;
                 const isCompletedRelease = Boolean(release.released) || Boolean(releaseEnd && releaseEnd < now);
-                const isInProgressRelease = Boolean(releaseStart && releaseStart <= now && (!releaseEnd || releaseEnd >= now));
+                const isInProgressRelease = Boolean(release.startDate && new Date(release.startDate) <= now && (!releaseEnd || releaseEnd >= now));
                 const isPendingRelease = !isCompletedRelease && !isInProgressRelease;
 
                 if (category === 'rolledOver') release.issues.rolledOver.push(issueData);
@@ -420,9 +415,10 @@ const getProjectReleasesReport = async (req, res) => {
             });
         });
 
-        res.json({ releases });
+        res.json({ releases: releases });
 
     } catch (error) {
+        console.error("Release Report Error:", error);
         res.status(500).json({ error: error.message });
     }
 };

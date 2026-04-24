@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Layers, Activity, CheckCircle, RotateCcw, PlusCircle, ArrowLeft, XCircle, TrendingUp } from 'lucide-react';
+import { Layers, Activity, CheckCircle, RotateCcw, PlusCircle, ArrowLeft, XCircle, TrendingUp, ClipboardList } from 'lucide-react';
 import { getAIReleaseHealth } from '../api/jiraApi';
 
 
@@ -11,9 +11,22 @@ const ReleaseReport = ({ data, projectKey }) => {
     const [aiLoading, setAiLoading] = useState(false);
     const [aiError, setAiError] = useState(null);
 
-
     // Data passed should be `{ releases: [...] }`
-    const releases = data?.releases || [];
+    const releases = useMemo(() => {
+        if (!data?.releases) return [];
+        return [...data.releases].sort((a, b) => {
+            const dateA = new Date(a.releaseDate || a.startDate || '1970-01-01').getTime();
+            const dateB = new Date(b.releaseDate || b.startDate || '1970-01-01').getTime();
+            return dateB - dateA; // Descending (newest first)
+        });
+    }, [data?.releases]);
+
+    // Auto-select latest release on mount
+    React.useEffect(() => {
+        if (releases.length > 0 && !selectedReleaseId) {
+            setSelectedReleaseId(releases[0].id);
+        }
+    }, [releases]);
 
     const selectedRelease = useMemo(() => {
         return releases.find(r => r.id === selectedReleaseId);
@@ -142,7 +155,9 @@ const ReleaseReport = ({ data, projectKey }) => {
 
                 {/* Left Column: All Releases List */}
                 <div style={{ width: '350px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '8px' }}>All Releases</h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, margin: 0 }}>All Releases</h3>
+                    </div>
 
                     {releases.length === 0 && (
                         <div className="glass-panel" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
@@ -155,15 +170,18 @@ const ReleaseReport = ({ data, projectKey }) => {
                         const completionRate = m.totalIssues > 0 ? ((m.completedIssues / m.totalIssues) * 100).toFixed(1) : 0;
                         const isSelected = selectedReleaseId === release.id;
 
+                        let phase = 'pending';
                         let badgeText = "Pending";
                         let badgeStyle = { bg: 'rgba(255,255,255,0.1)', text: 'var(--text-secondary)' };
 
                         if (release.released) {
                             badgeText = "Completed";
                             badgeStyle = { bg: 'rgba(16, 185, 129, 0.15)', text: '#10B981' };
+                            phase = 'completed';
                         } else if (new Date(release.startDate) <= new Date() && (!release.releaseDate || new Date(release.releaseDate) >= new Date())) {
                             badgeText = "In Progress";
                             badgeStyle = { bg: 'rgba(59, 130, 246, 0.15)', text: '#3B82F6' };
+                            phase = 'active';
                         }
 
                         return (
@@ -249,23 +267,16 @@ const ReleaseReport = ({ data, projectKey }) => {
                         );
                     })}
 
-                    {!showAllReleases && releases.length > 3 && (
-                        <button
-                            className="segment-tab"
-                            style={{
-                                width: '100%',
-                                background: 'rgba(56, 189, 248, 0.1)',
-                                color: 'var(--text-accent)',
-                                padding: '12px',
-                                border: '1px dashed rgba(56, 189, 248, 0.3)',
-                                transition: 'all 0.2s ease',
-                                marginTop: '8px'
-                            }}
-                            onClick={() => setShowAllReleases(true)}
+                    {releases.length > 3 && (
+                        <button 
+                            className="btn-secondary" 
+                            onClick={() => setShowAllReleases(!showAllReleases)}
+                            style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}
                         >
-                            Load more
+                            {showAllReleases ? 'Show Less' : `Show All (${releases.length})`}
                         </button>
                     )}
+
                 </div>
 
                 {/* Right Column: Drill down or Empty State */}
@@ -298,6 +309,25 @@ const ReleaseReport = ({ data, projectKey }) => {
                                     <h2 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '8px', color: 'var(--text-primary)' }}>{selectedRelease.name}</h2>
                                     <p style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}>{selectedRelease.description}</p>
                                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{formatDate(selectedRelease.startDate)} — {formatDate(selectedRelease.releaseDate)}</p>
+                                    
+                                    {/* Phase Banner */}
+                                    {(() => {
+                                        const now = new Date();
+                                        const start = new Date(selectedRelease.startDate);
+                                        const end = selectedRelease.releaseDate ? new Date(selectedRelease.releaseDate) : null;
+                                        
+                                        if (selectedRelease.released) return null; // No banner needed for completed
+                                        if (start > now) return (
+                                            <div style={{ marginTop: '12px', padding: '6px 12px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', fontSize: '0.85rem', display: 'inline-block', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                                📅 <strong>Future Release:</strong> Viewing planned scope and initial commitments.
+                                            </div>
+                                        );
+                                        return (
+                                            <div style={{ marginTop: '12px', padding: '6px 12px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '6px', fontSize: '0.85rem', display: 'inline-block', border: '1px solid rgba(59, 130, 246, 0.2)', color: '#3B82F6' }}>
+                                                ⚡ <strong>Active Release:</strong> Tracking ongoing execution and remaining work.
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                                 <button
                                     onClick={handleGenerateAIOverview}
@@ -336,15 +366,15 @@ const ReleaseReport = ({ data, projectKey }) => {
 
                             {/* Drill Metrics */}
                             <div style={{ display: 'flex', gap: '16px' }}>
-                                <div className="report-card" style={{ flex: 1, padding: '24px' }}>
+                                <div className="report-card" style={{ flex: 1, padding: '24px', opacity: new Date(selectedRelease.startDate) > new Date() ? 0.6 : 1 }}>
                                     <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>Completion Rate</div>
                                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '16px' }}>
                                         <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                                            {selectedRelease.metrics.totalIssues > 0 ? ((selectedRelease.metrics.completedIssues / selectedRelease.metrics.totalIssues) * 100).toFixed(1) : 0}%
+                                            {new Date(selectedRelease.startDate) > new Date() ? 'N/A' : (selectedRelease.metrics.totalIssues > 0 ? ((selectedRelease.metrics.completedIssues / selectedRelease.metrics.totalIssues) * 100).toFixed(1) : 0) + '%'}
                                         </div>
                                     </div>
                                     <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                                        {selectedRelease.metrics.completedIssues} of {selectedRelease.metrics.totalIssues} issues completed
+                                        {new Date(selectedRelease.startDate) > new Date() ? 'Not started' : `${selectedRelease.metrics.completedIssues} of ${selectedRelease.metrics.totalIssues} issues completed`}
                                     </div>
                                 </div>
 
@@ -356,7 +386,7 @@ const ReleaseReport = ({ data, projectKey }) => {
                                         </div>
                                     </div>
                                     <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                                        {selectedRelease.metrics.rolledOverIssues} issues carried from previous releases
+                                        {selectedRelease.metrics.rolledOverIssues} issues from earlier versions
                                     </div>
                                 </div>
 
@@ -368,7 +398,7 @@ const ReleaseReport = ({ data, projectKey }) => {
                                         </div>
                                     </div>
                                     <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                                        {selectedRelease.metrics.addedDuringRelease} issues added after release started
+                                        {selectedRelease.metrics.addedDuringRelease} issues added after start
                                     </div>
                                 </div>
                             </div>
@@ -376,16 +406,37 @@ const ReleaseReport = ({ data, projectKey }) => {
                             {/* Tabs */}
                             <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-elevated)', padding: '6px', borderRadius: 'var(--radius-lg)' }}>
                                 <button className={`segment-tab ${activeTab === 'rolledOver' ? 'active' : ''}`} onClick={() => setActiveTab('rolledOver')} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                    <RotateCcw size={16} /> Rolled Over <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>{selectedRelease.issues.rolledOver.length}</span>
+                                    <RotateCcw size={16} color={activeTab === 'rolledOver' ? '#F59E0B' : 'var(--text-secondary)'} /> {new Date(selectedRelease.startDate) > new Date() ? 'Rolled Over' : 'Rolled Over'} <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>{selectedRelease.issues.rolledOver.length}</span>
                                 </button>
                                 <button className={`segment-tab ${activeTab === 'addedDuring' ? 'active' : ''}`} onClick={() => setActiveTab('addedDuring')} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                    <PlusCircle size={16} /> Added During <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>{selectedRelease.issues.addedDuring.length}</span>
+                                    <PlusCircle size={16} color={activeTab === 'addedDuring' ? '#3B82F6' : 'var(--text-secondary)'} /> Added <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>{selectedRelease.issues.addedDuring.length}</span>
                                 </button>
                                 <button className={`segment-tab ${activeTab === 'notCompleted' ? 'active' : ''}`} onClick={() => setActiveTab('notCompleted')} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                    <XCircle size={16} /> Not Completed <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>{selectedRelease.issues.notCompleted.length}</span>
+                                    {(() => {
+                                        const now = new Date();
+                                        const start = new Date(selectedRelease.startDate);
+                                        const isRed = selectedRelease.released;
+                                        const isBlue = !selectedRelease.released && start <= now;
+                                        // Use a more vibrant Sky Blue/Purple for Planned Work if it's the active tab, 
+                                        // instead of a neutral gray, to ensure it "pops" like the others.
+                                        const color = activeTab === 'notCompleted' 
+                                            ? (isRed ? '#EF4444' : (isBlue ? '#3B82F6' : '#0EA5E9'))
+                                            : 'var(--text-secondary)';
+
+                                        if (selectedRelease.released) return <XCircle size={16} color={color} />;
+                                        return <ClipboardList size={16} color={color} />;
+                                    })()}
+                                    {(() => {
+                                        const now = new Date();
+                                        const start = new Date(selectedRelease.startDate);
+                                        if (selectedRelease.released) return 'Not Completed';
+                                        if (start > now) return 'Planned Work';
+                                        return 'Remaining Work';
+                                    })()}
+                                    <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>{selectedRelease.issues.notCompleted.length}</span>
                                 </button>
                                 <button className={`segment-tab ${activeTab === 'completed' ? 'active' : ''}`} onClick={() => setActiveTab('completed')} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                    <CheckCircle size={16} /> Completed <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>{selectedRelease.issues.completed.length}</span>
+                                    <CheckCircle size={16} color={activeTab === 'completed' ? '#10B981' : 'var(--text-secondary)'} /> Completed <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>{selectedRelease.issues.completed.length}</span>
                                 </button>
                             </div>
 
@@ -393,15 +444,40 @@ const ReleaseReport = ({ data, projectKey }) => {
                             <div>
                                 <h3 style={{ fontSize: '1.1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                                     {activeTab === 'rolledOver' && <><RotateCcw size={20} color="#F59E0B" /> Rolled Over from Previous Releases</>}
-                                    {activeTab === 'addedDuring' && <><PlusCircle size={20} color="#3B82F6" /> Added During Release</>}
-                                    {activeTab === 'notCompleted' && <><XCircle size={20} color="#EF4444" /> Not Completed in this Release</>}
+                                    {activeTab === 'addedDuring' && <><PlusCircle size={20} color="#3B82F6" /> Added during Release Window</>}
+                                    {activeTab === 'notCompleted' && (
+                                        <>
+                                            {(() => {
+                                                const now = new Date();
+                                                const start = new Date(selectedRelease.startDate);
+                                                if (selectedRelease.released) return <XCircle size={20} color="#EF4444" />;
+                                                if (start > now) return <ClipboardList size={20} color="#0EA5E9" />;
+                                                return <ClipboardList size={20} color="#3B82F6" />;
+                                            })()}
+                                            {(() => {
+                                                const now = new Date();
+                                                const start = new Date(selectedRelease.startDate);
+                                                if (selectedRelease.released) return 'Not Completed in this Release';
+                                                if (start > now) return 'Planned Work Items';
+                                                return 'Remaining Work (Ongoing)';
+                                            })()}
+                                        </>
+                                    )}
                                     {activeTab === 'completed' && <><CheckCircle size={20} color="#10B981" /> Completed in this Release</>}
                                 </h3>
                                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>
-                                    {activeTab === 'rolledOver' && "Issues that were not completed in their original release and carried forward"}
-                                    {activeTab === 'addedDuring' && "Issues that were added to the Fix Version after the release start date"}
-                                    {activeTab === 'notCompleted' && "Issues belonging to the release Fix Version that are not Done at the release end date"}
-                                    {activeTab === 'completed' && "Issues successfully completed during this release"}
+                                    {activeTab === 'rolledOver' && "Issues carried forward from earlier versions"}
+                                    {activeTab === 'addedDuring' && "Scope additions detected during the release period"}
+                                    {activeTab === 'notCompleted' && (
+                                        (() => {
+                                            const now = new Date();
+                                            const start = new Date(selectedRelease.startDate);
+                                            if (selectedRelease.released) return "Issues belonging to this release that were not completed by the release date";
+                                            if (start > now) return "Issues currently scheduled for this future release window";
+                                            return "Initial scope and ongoing tasks currently assigned to this active release";
+                                        })()
+                                    )}
+                                    {activeTab === 'completed' && "Issues successfully delivered in this release window"}
                                 </p>
 
                                 {/* Table */}
