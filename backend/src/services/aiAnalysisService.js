@@ -8,11 +8,50 @@ const analyzeSprintHealth = async (data) => {
 
         const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-        const sprintPhaseRaw = data.totalDays > 0 ? (data.sprintDay / data.totalDays) * 100 : 0;
-        const sprintPhaseLabel = sprintPhaseRaw < 25 ? 'early (just started)'
-            : sprintPhaseRaw < 60 ? 'mid-sprint'
-            : sprintPhaseRaw < 85 ? 'late sprint'
-            : 'final stretch or complete';
+        const sprintPhase = data.sprintPhase || 'active';
+        let sprintPhaseLabel = '';
+
+        if (sprintPhase === 'completed') {
+            sprintPhaseLabel = 'Completed';
+        } else if (sprintPhase === 'future') {
+            sprintPhaseLabel = 'Future (Not started)';
+        } else {
+            const sprintPhaseRaw = data.totalDays > 0 ? (data.sprintDay / data.totalDays) * 100 : 0;
+            sprintPhaseLabel = sprintPhaseRaw < 25 ? 'early (just started)'
+                : sprintPhaseRaw < 60 ? 'mid-sprint'
+                : sprintPhaseRaw < 85 ? 'late sprint'
+                : 'final stretch';
+        }
+
+        let phaseSpecificInstructions = "";
+        if (sprintPhase === 'completed') {
+            phaseSpecificInstructions = `
+=====================================
+PHASE: COMPLETED (RETROSPECTIVE MODE)
+=====================================
+- This sprint is finished.
+- DO NOT use phrases like "early stage", "monitoring", or "too early to judge".
+- DO NOT focus on "active workload" or "predicting" the outcome.
+- Focus ONLY on:
+  a) FINAL DELIVERY (Commitment Reliability)
+  b) Completed vs Not Completed work (final totals)
+  c) Roll-over items (what actually moved to the next sprint)
+  d) Scope change (what was added and how it impacted results)
+  e) Overall performance evaluation vs the initial plan.
+- TONE: Professional retrospective, evaluative, non-predictive.
+- IMPORTANT: Ignore progress percent metrics; as the sprint is finished, these are no longer predictive.
+`;
+        } else {
+            phaseSpecificInstructions = `
+=====================================
+PHASE: ACTIVE (MONITORING MODE)
+=====================================
+- This sprint is currently in progress (${sprintPhaseLabel}).
+- Focus on flow, bottlenecks, and delivery risks.
+- If in the early phase, avoid overreacting to low completion rates.
+- TONE: Observational, predictive, coaching.
+`;
+        }
 
         const prompt = `You are a senior Project Manager / Scrum Master / CTO advisor analyzing Jira sprint health.
 
@@ -29,7 +68,10 @@ CONTEXT
 
 Sprint Name: ${data.sprintName}
 Status: ${data.sprintStatus}
-Current Day: Day ${data.sprintDay} of ${data.totalDays} (${sprintPhaseLabel}) — ${data.progressPercent || 0}% through the sprint
+Sprint Phase: ${sprintPhase}
+${sprintPhase === 'active' ? `Current Day: Day ${data.sprintDay} of ${data.totalDays} (${sprintPhaseLabel}) — ${data.progressPercent || 0}% through the sprint` : `This sprint is ${sprintPhase}.`}
+
+${phaseSpecificInstructions}
 Rollover items from previous sprint: ${data.rolloverCount || 0}
 
 STATUS DISTRIBUTION (how tasks are spread across workflow stages):
@@ -91,11 +133,13 @@ CORE ANALYSIS RULES
    If an item is rollover from a previous sprint but is already in a late-stage status such as Code Review, Ready for QA, or Ready For Release, do NOT treat it as heavy new workload.
    Instead, interpret it as carry-over that is already near completion.
 
-6. This sprint may still be ACTIVE and in early or mid phase.
-   Do NOT overreact to incomplete delivery early in the sprint.
-   Use caution when interpreting commitment reliability and delivery signals before the sprint is near completion.
+6. PHASE AWARENESS IS CRITICAL:
+   - If phase is COMPLETED: You are writing a final report. Use past tense. Focus on what was achieved vs what was planned.
+   - If phase is ACTIVE: You are monitoring progress. Use present/future tense. Focus on what needs to happen to succeed.
 
-7. If the data is incomplete, unstable, or still too early in the sprint, explicitly mention that and lower your confidence.
+7. CONFIDENCE:
+   - If sprint is COMPLETED, confidence should generally be High.
+   - If sprint is ACTIVE but very early, confidence should be Lower.
 
 =====================================
 WHAT TO FOCUS ON
