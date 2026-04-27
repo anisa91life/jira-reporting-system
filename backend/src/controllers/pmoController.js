@@ -388,11 +388,7 @@ const getPMOSprintReport = async (req, res) => {
             }
 
             // Blockers
-            const hasBlockers = issue.fields.issuelinks?.some(link =>
-                (link.type?.inward === 'is blocked by' && link.inwardIssue) ||
-                (link.type?.name === 'Blocks' && link.inwardIssue)
-            );
-            if (hasBlockers) blockedCount++;
+            if (issue.fields.status?.name === 'Blocked') blockedCount++;
 
             // Per-assignee workload breakdown
             const assigneeName = issue.fields.assignee?.displayName || 'Unassigned';
@@ -574,12 +570,12 @@ const getPMOSprintReport = async (req, res) => {
                     description: 'Total bugs in sprint vs completed bugs.'
                 },
                 {
-                    name: 'Dependency Delays',
+                    name: 'Blocked Issues',
                     value: blockedCount,
                     trend: blockedCount > 3 ? '↑' : '→',
                     confidence: 'Low',
                     insight: blockedCount > 3 ? 'Multiple blockers — needs attention' : 'Under control',
-                    description: 'Issues currently blocked by dependencies on other teams or work.'
+                    description: 'Issues currently in Blocked status in this sprint.'
                 },
             ],
             assigneeWorkload,
