@@ -9,7 +9,8 @@
 const PROJECT_COMPLETION_MAP = {
     AIE: new Set(['code review', 'ready for stage', 'ready for qa', 'in qa', 'ready for prod', 'done']),
     HAR: new Set(['ready for code review', 'in review', 'code review', 'ready for qa', 'in qa', 'ready for uat', 'done']),
-    HP: new Set(['ready for code review', 'code review', 'ready for qa', 'in qa', 'ready for uat', 'in uat', 'ready for release', 'done'])
+    HP: new Set(['ready for code review', 'code review', 'ready for qa', 'in qa', 'ready for uat', 'in uat', 'ready for release', 'done']),
+    PF: new Set(['ready for code review', 'code review', 'ready for qa', 'in qa', 'ready for uat', 'done'])
 };
 
 const DEFAULT_COMPLETION_STATUSES = new Set(['done']);
