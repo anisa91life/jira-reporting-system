@@ -19,8 +19,8 @@ const analyzeSprintHealth = async (data) => {
             const sprintPhaseRaw = data.totalDays > 0 ? (data.sprintDay / data.totalDays) * 100 : 0;
             sprintPhaseLabel = sprintPhaseRaw < 25 ? 'early (just started)'
                 : sprintPhaseRaw < 60 ? 'mid-sprint'
-                : sprintPhaseRaw < 85 ? 'late sprint'
-                : 'final stretch';
+                    : sprintPhaseRaw < 85 ? 'late sprint'
+                        : 'final stretch';
         }
 
         let phaseSpecificInstructions = "";
@@ -285,6 +285,9 @@ Analyze the provided Jira Release data and provide a concise, high-level health 
 
 CONTEXT:
 Release Phase: ${data.phase || 'Unknown'} (Future/Active/Completed)
+Days Elapsed: ${data.daysElapsed || 0}
+Total Duration: ${data.totalDuration || 0} days
+Time Progress: ${data.timeProgressPercent || 0}% through the release window
 Metrics provided are calculated using project-specific completion logic (AIE/HAR/HP mappings).
 
 DATA:
@@ -295,30 +298,47 @@ DATA:
 - Added After Start: ${data.metrics.addedDuringRelease}
 
 RULES:
-1. PHASE-AWARENESS:
-   - FUTURE: Focus on planned scope and initial commitments. Use neutral, preparatory language.
-   - ACTIVE: Focus on execution progress, remaining work, and scope change risks. Use dynamic, tracking language.
-   - COMPLETED: Focus on delivery performance, what was missed, and overall stability. Use reflective, final language.
+1. PHASE & PROGRESS AWARENESS (STRICT):
+   - Definition of EARLY PHASE: Release is in its first 3 days OR Time Progress is <= 20%.
+   - Definition of MID/LATE PHASE: Release is older than 3 days AND Time Progress is > 20%.
+
+   - IF ACTIVE (EARLY PHASE): 
+     * Low completion is NORMAL. 
+     * DO NOT mark as Red based on low completion alone. 
+     * Focus on tracking progress and readiness.
+     * Tone: Monitoring / Neutral.
+
+   - IF ACTIVE (MID/LATE PHASE):
+     * DO NOT use phrases like "early stage", "just started", or "normal at this stage".
+     * Evaluate completion strictly against time elapsed. 
+     * If Time Progress is 50% but Completion is only 10%, this is AT RISK (Red).
+     * Tone: Decisive / Evaluative.
+
+   - FUTURE: Focus on planned scope. Do NOT flag as delayed.
+   - COMPLETED: Focus on final delivery. Use past tense.
 
 2. LOGIC:
-   - Use the provided counts directly. Do NOT recalculate percentages from issue lists.
    - Completion Rate = (Completed / Total) * 100.
    - Roll-over Rate = (Rolled Over / Total) * 100.
    - Scope Change = (Added After Start / Total) * 100.
 
 3. STATUS MAPPING:
-   - Trust the metrics provided. "isFinished" has already been determined by the backend for all issues.
+   - Early Active releases with stable scope are usually "Green" or "Monitoring".
+   - Mid/Late Active releases with poor completion vs time progress are "Yellow" or "Red".
 
-4. TONE:
-   - Professional PMO tone. Concise and factual.
-   - Max 4 lines.
+4. TONE & STYLE:
+   - Senior PMO / Delivery Manager tone: Analytical, decisive, and professional.
+   - Avoid generic phrases like "everything looks fine" or "on track" without context.
+   - Use Past Tense for Completed, Present for Active/Future.
+   - Max 8 lines total (strict).
+   - No bullet points.
    - Plain text only.
 
-5. OUTPUT TEMPLATE:
-   - Line 1: [Phase Emoji] {Release Name} - {Phase} Status: {Health Color: Green/Yellow/Red}
-   - Line 2: Completion: {Completion Rate}% | Roll-over: {Roll-over Rate}% | Scope Change: {Scope Change}%
-   - Line 3: {One sentence on main trend or risk}
-   - Line 4: {One recommended action item}
+5. OUTPUT TEMPLATE (STRICT 5-LINE STRUCTURE):
+   Line 1: {Release Name} - {Phase} Status: {Green/Yellow/Red}
+   Line 2: ASSESSMENT: One sentence evaluating delivery velocity against the ${data.timeProgressPercent}% time progress.
+   Line 3: RISK: One specific observation regarding the main bottleneck or delivery concern.
+   Line 4: ACTION: One clear, professional PM recommendation to ensure or restore delivery stability.
 
 INPUT JSON:
 ${JSON.stringify(data, null, 2)}`;
