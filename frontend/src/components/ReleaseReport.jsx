@@ -85,14 +85,24 @@ const ReleaseReport = ({ data, projectKey }) => {
         // Determine phase for AI context
         const now = new Date();
         const start = new Date(selectedRelease.startDate);
+        const end = selectedRelease.releaseDate ? new Date(selectedRelease.releaseDate) : null;
+        
         let phase = 'future';
         if (selectedRelease.released) phase = 'completed';
-        else if (start <= now) phase = 'active';
+        else if (start <= now && (!end || end >= now)) phase = 'active';
+
+        // Calculate progress context
+        const totalDuration = end && start ? Math.ceil((end - start) / (1000 * 60 * 60 * 24)) : 0;
+        const daysElapsed = start <= now ? Math.ceil((now - start) / (1000 * 60 * 60 * 24)) : 0;
+        const timeProgressPercent = totalDuration > 0 ? Math.min(100, Math.round((daysElapsed / totalDuration) * 100)) : 0;
 
         try {
             const result = await getAIReleaseHealth({
                 ...selectedRelease,
-                phase
+                phase,
+                daysElapsed,
+                totalDuration,
+                timeProgressPercent
             });
             setAiAnalysis(result.aiAnalysis);
         } catch (err) {
@@ -325,7 +335,6 @@ const ReleaseReport = ({ data, projectKey }) => {
                                     {(() => {
                                         const now = new Date();
                                         const start = new Date(selectedRelease.startDate);
-                                        const end = selectedRelease.releaseDate ? new Date(selectedRelease.releaseDate) : null;
                                         
                                         if (selectedRelease.released) return null; // No banner needed for completed
                                         if (start > now) return (
@@ -333,11 +342,7 @@ const ReleaseReport = ({ data, projectKey }) => {
                                                 📅 <strong>Future Release:</strong> Viewing planned scope and initial commitments.
                                             </div>
                                         );
-                                        return (
-                                            <div style={{ marginTop: '12px', padding: '6px 12px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '6px', fontSize: '0.85rem', display: 'inline-block', border: '1px solid rgba(59, 130, 246, 0.2)', color: '#3B82F6' }}>
-                                                ⚡ <strong>Active Release:</strong> Tracking ongoing execution and remaining work.
-                                            </div>
-                                        );
+                                        return null; // Removed Active Release banner per instructions
                                     })()}
                                 </div>
                                 <button
@@ -364,16 +369,25 @@ const ReleaseReport = ({ data, projectKey }) => {
                                 </div>
                             )}
 
-                            {aiAnalysis && (
-                                <div className="glass-panel fade-in" style={{ padding: '24px', background: 'linear-gradient(to right, rgba(99, 102, 241, 0.05), rgba(139, 92, 246, 0.05))', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
-                                    <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
-                                        <Activity size={20} color="#8b5cf6" /> AI Release Health Overview
-                                    </h3>
-                                    <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-                                        {aiAnalysis}
+                            {aiAnalysis && (() => {
+                                const firstLine = aiAnalysis.split('\n')[0] || '';
+                                let indicator = '⚪';
+                                if (firstLine.includes('Green')) indicator = '🟢';
+                                else if (firstLine.includes('Yellow')) indicator = '🟡';
+                                else if (firstLine.includes('Red')) indicator = '🔴';
+
+                                return (
+                                    <div className="glass-panel fade-in" style={{ padding: '24px', background: 'linear-gradient(to right, rgba(99, 102, 241, 0.05), rgba(139, 92, 246, 0.05))', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+                                        <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                                            <Activity size={20} color="#8b5cf6" /> AI Release Health Overview
+                                        </h3>
+                                        <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
+                                            <span style={{ fontSize: '1.1rem', marginRight: '8px' }}>{indicator}</span>
+                                            {aiAnalysis}
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                );
+                            })()}
 
                             {/* Drill Metrics */}
                             <div style={{ display: 'flex', gap: '16px' }}>
