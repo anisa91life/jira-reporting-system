@@ -18,6 +18,14 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok', message: 'Backend is running' });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`Server is running on port ${PORT}`);
+
+    // Optional: Test database connection on startup
+    if (process.env.DB_HOST) {
+        const db = require('./src/config/database');
+        await db.testConnection();
+    } else {
+        console.log('[DB] ⏭️  No DB_HOST configured — skipping database connection.');
+    }
 });
