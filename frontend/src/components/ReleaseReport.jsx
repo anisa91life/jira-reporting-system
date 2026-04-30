@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Layers, Activity, CheckCircle, RotateCcw, PlusCircle, ArrowLeft, XCircle, TrendingUp, ClipboardList } from 'lucide-react';
+import { Layers, Activity, CheckCircle, RotateCcw, PlusCircle, ArrowLeft, XCircle, TrendingUp, ClipboardList, GitMerge } from 'lucide-react';
 import { getAIReleaseHealth } from '../api/jiraApi';
-
+import DeploymentHealth from './DeploymentHealth';
 
 const ReleaseReport = ({ data, projectKey }) => {
     const [selectedReleaseId, setSelectedReleaseId] = useState(null);
@@ -10,6 +10,7 @@ const ReleaseReport = ({ data, projectKey }) => {
     const [aiAnalysis, setAiAnalysis] = useState(null);
     const [aiLoading, setAiLoading] = useState(false);
     const [aiError, setAiError] = useState(null);
+    const [showDeploymentHealth, setShowDeploymentHealth] = useState(false);
 
     // Data passed should be `{ releases: [...] }`
     const releases = useMemo(() => {
@@ -115,6 +116,34 @@ const ReleaseReport = ({ data, projectKey }) => {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <style>
+                {`
+                .btn-deployment {
+                    background: rgba(16, 185, 129, 0.1) !important;
+                    color: var(--text-primary) !important;
+                    border: 1px solid rgba(16, 185, 129, 0.2) !important;
+                    white-space: nowrap !important;
+                    transition: all 0.2s ease;
+                }
+                .btn-deployment:hover:not(:disabled) {
+                    filter: brightness(1.15);
+                    transform: translateY(-1px);
+                }
+                .btn-ai {
+                    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
+                    color: #fff !important;
+                    border: none !important;
+                    white-space: nowrap !important;
+                    transition: all 0.2s ease;
+                    box-shadow: 0 4px 12px rgba(99,102,241,0.3) !important;
+                }
+                .btn-ai:hover:not(:disabled) {
+                    filter: brightness(1.15);
+                    box-shadow: 0 6px 16px rgba(99,102,241,0.4) !important;
+                    transform: translateY(-1px);
+                }
+                `}
+            </style>
 
             {/* Top Aggregated Cards */}
             <div className="grid-cards fade-in">
@@ -220,6 +249,7 @@ const ReleaseReport = ({ data, projectKey }) => {
                                     setActiveTab('rolledOver');
                                     setAiAnalysis(null);
                                     setAiError(null);
+                                    setShowDeploymentHealth(false);
                                 }}
                             >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -311,55 +341,73 @@ const ReleaseReport = ({ data, projectKey }) => {
                             <h3 style={{ fontSize: '1.3rem', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>Select a Release</h3>
                             <p style={{ color: 'var(--text-secondary)' }}>Click on a release from the list to view its details and metrics</p>
                         </div>
+                    ) : showDeploymentHealth ? (
+                        <DeploymentHealth release={selectedRelease} onBack={() => setShowDeploymentHealth(false)} />
                     ) : (
                         <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                             {/* Drill header */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                <div>
+                            <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                                     <button
                                         className="btn-invisible"
-                                        style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', marginBottom: '16px', fontWeight: 600, padding: 0 }}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', fontWeight: 600, padding: 0 }}
                                         onClick={() => {
                                             setSelectedReleaseId(null);
                                             setAiAnalysis(null);
                                             setAiError(null);
+                                            setShowDeploymentHealth(false);
                                         }}
                                     >
                                         <ArrowLeft size={16} /> Back to Releases
                                     </button>
-                                    <h2 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '8px', color: 'var(--text-primary)' }}>{selectedRelease.name}</h2>
-                                    <p style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}>{selectedRelease.description}</p>
-                                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{formatDate(selectedRelease.startDate)} — {formatDate(selectedRelease.releaseDate)}</p>
                                     
-                                    {/* Phase Banner */}
-                                    {(() => {
-                                        const now = new Date();
-                                        const start = new Date(selectedRelease.startDate);
-                                        
-                                        if (selectedRelease.released) return null; // No banner needed for completed
-                                        if (start > now) return (
-                                            <div style={{ marginTop: '12px', padding: '6px 12px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', fontSize: '0.85rem', display: 'inline-block', border: '1px solid rgba(255,255,255,0.1)' }}>
-                                                📅 <strong>Future Release:</strong> Viewing planned scope and initial commitments.
-                                            </div>
-                                        );
-                                        return null; // Removed Active Release banner per instructions
-                                    })()}
+                                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                        <button
+                                            className="btn-deployment"
+                                            onClick={() => setShowDeploymentHealth(true)}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: '8px',
+                                                padding: '10px 16px', borderRadius: '8px',
+                                                fontWeight: 600, cursor: 'pointer'
+                                            }}
+                                        >
+                                            <GitMerge size={18} color="#10B981" />
+                                            Deployment Health
+                                        </button>
+                                        <button
+                                            className="btn-ai"
+                                            onClick={handleGenerateAIOverview}
+                                            disabled={aiLoading}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: '8px',
+                                                padding: '10px 16px', borderRadius: '8px',
+                                                fontWeight: 600, cursor: aiLoading ? 'not-allowed' : 'pointer',
+                                                opacity: aiLoading ? 0.7 : 1
+                                            }}
+                                        >
+                                            <Activity size={18} />
+                                            {aiLoading ? 'Generating...' : 'Release Health AI Overview'}
+                                        </button>
+                                    </div>
                                 </div>
-                                <button
-                                    onClick={handleGenerateAIOverview}
-                                    disabled={aiLoading}
-                                    style={{
-                                        display: 'flex', alignItems: 'center', gap: '8px',
-                                        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                                        color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '8px',
-                                        fontWeight: 600, cursor: aiLoading ? 'not-allowed' : 'pointer',
-                                        opacity: aiLoading ? 0.7 : 1, transition: 'all 0.2s',
-                                        boxShadow: '0 4px 12px rgba(99,102,241,0.3)'
-                                    }}
-                                >
-                                    <Activity size={18} />
-                                    {aiLoading ? 'Generating...' : 'Release Health AI Overview'}
-                                </button>
+                                
+                                <h2 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '8px', color: 'var(--text-primary)' }}>{selectedRelease.name}</h2>
+                                <p style={{ color: 'var(--text-secondary)', marginBottom: '8px', lineHeight: '1.6' }}>{selectedRelease.description}</p>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{formatDate(selectedRelease.startDate)} — {formatDate(selectedRelease.releaseDate)}</p>
+                                
+                                {/* Phase Banner */}
+                                {(() => {
+                                    const now = new Date();
+                                    const start = new Date(selectedRelease.startDate);
+                                    
+                                    if (selectedRelease.released) return null; // No banner needed for completed
+                                    if (start > now) return (
+                                        <div style={{ marginTop: '12px', padding: '6px 12px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', fontSize: '0.85rem', display: 'inline-block', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                            📅 <strong>Future Release:</strong> Viewing planned scope and initial commitments.
+                                        </div>
+                                    );
+                                    return null; // Removed Active Release banner per instructions
+                                })()}
                             </div>
 
                             {/* AI Analysis View */}
