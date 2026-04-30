@@ -1,15 +1,26 @@
 import React, { useState } from 'react';
-import { AlertCircle, CheckCircle, TrendingUp, TrendingDown, Clock, Bug, Shield, ArrowRight, CornerDownRight, Calendar, Info, Cpu, Loader, Layers, Activity, ActivitySquare, Users } from 'lucide-react';
+import { AlertCircle, CheckCircle, TrendingUp, TrendingDown, Clock, Bug, Shield, ArrowRight, CornerDownRight, Calendar, Info, Cpu, Loader, Layers, Activity, ActivitySquare, Users, ChevronDown, ChevronUp } from 'lucide-react';
 import { CommitmentChart, BugTrendChart, WorkDistributionChart } from './PMOCharts';
 import { StatusPieChart, PriorityPieChart } from './Charts';
 import ReportCard from './ReportCard';
 import InfoTooltip from './InfoTooltip';
 import { getAISprintHealth } from '../api/jiraApi';
 
-const PMOReport = ({ data, projectKey, sprintId }) => {
+const PMOReport = ({ data, projectKey, sprintId, projectName }) => {
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [expandedTeams, setExpandedTeams] = useState({});
+
+  const toggleTeam = (teamName) => {
+    setExpandedTeams(prev => ({ ...prev, [teamName]: !prev[teamName] }));
+  };
+
+  const TECH_LEADS = {
+    "Healthcare Platform & Data Foundation Team": "Gentrit Hoxha",
+    "Operational Efficiency & Automation Team": "Fitim Halimi",
+    "Patient Care & Clinical Workflows Team": "Vera Jerliu"
+  };
 
   const generateAIInsights = async () => {
     setIsAnalyzing(true);
@@ -249,8 +260,8 @@ const PMOReport = ({ data, projectKey, sprintId }) => {
             <div className="pmo-metric-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span>{metric.name}</span>
-                <InfoTooltip 
-                  text={metric.description} 
+                <InfoTooltip
+                  text={metric.description}
                   details={metric.details}
                   type={metric.name === 'Unplanned Work' ? 'popover' : 'tooltip'}
                 />
@@ -342,6 +353,160 @@ const PMOReport = ({ data, projectKey, sprintId }) => {
               <PriorityPieChart data={data.priorityDistribution || {}} />
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 6. Team Analytics */}
+      {data.teamAnalytics && projectName === 'Heart+ App Rewrite' && (
+        <div className="glass-panel fade-in" style={{ padding: '32px', marginTop: '32px', animationDelay: '0.4s' }}>
+          <h3 style={{ marginBottom: '24px', fontSize: '1.2rem', fontWeight: 600 }}>Team Performance</h3>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+            {Object.entries(data.teamAnalytics).map(([teamName, stats]) => {
+              const percent = stats.totalSP > 0 ? Math.round((stats.completedSP / stats.totalSP) * 100) : 0;
+              const isExpanded = expandedTeams[teamName];
+              const techLead = TECH_LEADS[teamName] || '';
+
+              // Sort engineers: Tech lead first, then others by completedSP descending
+              const sortedEngineers = [...(stats.engineers || [])].sort((a, b) => {
+                if (a.name === techLead) return -1;
+                if (b.name === techLead) return 1;
+                return b.completedSP - a.completedSP;
+              });
+
+              const memberCount = stats.engineers ? stats.engineers.length : 0;
+
+              // Determine team colors matching the provided reference image
+              const isHealthcare = teamName.includes('Healthcare');
+              const isOperational = teamName.includes('Operational');
+              const colorCode = isHealthcare ? '#0ea5e9' : isOperational ? '#10b981' : '#f59e0b';
+              const bgCode = isHealthcare ? 'rgba(14, 165, 233, 0.1)' : isOperational ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)';
+
+              return (
+                <div key={teamName} style={{
+                  background: 'var(--bg-panel)',
+                  border: '1px solid var(--border-light)',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}>
+                  {/* Top Color Bar */}
+                  <div style={{
+                    height: '4px',
+                    width: '100%',
+                    background: colorCode
+                  }} />
+
+                  <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    {/* Header: Icon + Name */}
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                      <div style={{
+                        width: '36px', height: '36px', borderRadius: '8px',
+                        background: bgCode,
+                        color: colorCode,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <Users size={18} />
+                      </div>
+                      <div>
+                        <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: '1.2', marginBottom: '4px' }}>
+                          {teamName.replace(' Team', '')}
+                        </h4>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{memberCount} members</span>
+                      </div>
+                    </div>
+
+                    {/* Stats: Total vs Completed SP */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                          <span style={{ opacity: 0.5 }}>◎</span> Total SP
+                        </div>
+                        <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{stats.totalSP}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                          <CheckCircle size={12} style={{ opacity: 0.5 }} /> Completed SP
+                        </div>
+                        <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{stats.completedSP}</div>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <div
+                          onClick={() => toggleTeam(teamName)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-secondary)' }}
+                        >
+                          Progress
+                          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '4px', border: '1px solid var(--border-light)' }}>
+                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          </span>
+                        </div>
+                        <span style={{
+                          fontWeight: 'bold', fontSize: '1.2rem',
+                          color: percent >= 80 ? 'var(--accent-success)' : percent >= 50 ? 'var(--accent-warning)' : 'var(--accent-danger)'
+                        }}>{percent}%</span>
+                      </div>
+                      <div style={{ width: '100%', height: '8px', background: 'var(--border-light)', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%', width: `${percent}%`,
+                          background: percent >= 80 ? 'var(--accent-success)' : percent >= 50 ? 'var(--accent-warning)' : 'var(--accent-danger)',
+                          borderRadius: '4px', transition: 'width 0.5s ease-out'
+                        }}></div>
+                      </div>
+                    </div>
+
+                    {/* Drill-Down View */}
+                    {isExpanded && (
+                      <div className="fade-in-up" style={{ marginTop: '8px', borderTop: '1px solid var(--border-light)', paddingTop: '16px' }}>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '12px', fontWeight: 500 }}>
+                          Story Points by Engineer
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {sortedEngineers.map((eng, idx) => {
+                            const isLead = eng.name === techLead;
+                            const engPercent = eng.totalSP > 0 ? Math.round((eng.completedSP / eng.totalSP) * 100) : 0;
+                            const displayName = eng.name;
+
+                            return (
+                              <div key={idx} style={{
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                padding: '8px 12px', background: 'rgba(0,0,0,0.02)', borderRadius: '8px'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: isLead ? 600 : 500, color: 'var(--text-primary)' }}>
+                                  <span>{displayName}</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                  {isLead ? (
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>Tech Lead</span>
+                                  ) : (
+                                    <>
+                                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{eng.completedSP}/{eng.totalSP} SP</span>
+                                      <span style={{
+                                        fontWeight: 'bold', fontSize: '0.85rem', width: '36px', textAlign: 'right',
+                                        color: engPercent >= 80 ? 'var(--accent-success)' : engPercent >= 50 ? 'var(--accent-warning)' : 'var(--accent-danger)'
+                                      }}>{engPercent}%</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+
         </div>
       )}
 
