@@ -191,6 +191,24 @@ const getPMOSprintReport = async (req, res) => {
         const teamMembersMap = {};
         const teamMembersDebugLog = {};
 
+        const TEAMS = {
+            "Healthcare Platform & Data Foundation Team": ["Gentrit Hoxha", "Vullnet Gervalla", "Albin Kurtaj", "Erion Hamiti", "Zana Misini"],
+            "Operational Efficiency & Automation Team": ["Fitim Halimi", "Redon Krasniqi", "Ana Laze", "Fabian Jorgji", "Klaidi Merdhoci", "Syard Dauti", "Urim Hoxha"],
+            "Patient Care & Clinical Workflows Team": ["Vera Jerliu", "Bleron Sylmetaj", "Shpend Ismaili", "Ermal Ismajli", "Jetmir Demiri"]
+        };
+
+        const teamAnalytics = {
+            "Healthcare Platform & Data Foundation Team": { totalSP: 0, completedSP: 0, issueKeys: new Set(), engineers: {} },
+            "Operational Efficiency & Automation Team": { totalSP: 0, completedSP: 0, issueKeys: new Set(), engineers: {} },
+            "Patient Care & Clinical Workflows Team": { totalSP: 0, completedSP: 0, issueKeys: new Set(), engineers: {} }
+        };
+
+        for (const [teamName, members] of Object.entries(TEAMS)) {
+            members.forEach(m => {
+                teamAnalytics[teamName].engineers[m] = { name: m, totalSP: 0, completedSP: 0 };
+            });
+        }
+
         // Trackers
         let bugsCreated = 0;
         let bugsResolved = 0;
@@ -218,6 +236,34 @@ const getPMOSprintReport = async (req, res) => {
 
             const isDone = isEffectivelyDone(issue, projectKey);
             const isLate = isLateStage(issue);
+
+            // Team Analytics
+            if (issue.fields.assignee && points > 0) {
+                const assigneeName = issue.fields.assignee.displayName;
+                let memberTeam = null;
+                for (const [teamName, members] of Object.entries(TEAMS)) {
+                    if (members.includes(assigneeName)) {
+                        memberTeam = teamName;
+                        break;
+                    }
+                }
+
+                if (memberTeam) {
+                    if (!teamAnalytics[memberTeam].issueKeys.has(issue.key)) {
+                        teamAnalytics[memberTeam].issueKeys.add(issue.key);
+                        teamAnalytics[memberTeam].totalSP += points;
+                        teamAnalytics[memberTeam].engineers[assigneeName].totalSP += points;
+                        // Status Category = "Ready For Code Review" (Assuming it maps to standard issue.fields.status.name)
+                        // Actually, wait, "Status Category" might mean the status name is "Ready For Code Review" or "Done" or something.
+                        // Let's use exact match for "Ready For Code Review" as requested.
+                        const statusName = issue.fields.status?.name || '';
+                        if (statusName === "Ready For Code Review" || statusName.toLowerCase() === "ready for code review") {
+                            teamAnalytics[memberTeam].completedSP += points;
+                            teamAnalytics[memberTeam].engineers[assigneeName].completedSP += points;
+                        }
+                    }
+                }
+            }
 
             if (isDone) {
                 doneIssuesCount++;
@@ -602,7 +648,24 @@ const getPMOSprintReport = async (req, res) => {
             statusDistribution,
             priorityDistribution,
             assigneeDistribution,
-            teamMembers: finalTeamMembers
+            teamMembers: finalTeamMembers,
+            teamAnalytics: {
+                "Healthcare Platform & Data Foundation Team": {
+                    totalSP: teamAnalytics["Healthcare Platform & Data Foundation Team"].totalSP,
+                    completedSP: teamAnalytics["Healthcare Platform & Data Foundation Team"].completedSP,
+                    engineers: Object.values(teamAnalytics["Healthcare Platform & Data Foundation Team"].engineers)
+                },
+                "Operational Efficiency & Automation Team": {
+                    totalSP: teamAnalytics["Operational Efficiency & Automation Team"].totalSP,
+                    completedSP: teamAnalytics["Operational Efficiency & Automation Team"].completedSP,
+                    engineers: Object.values(teamAnalytics["Operational Efficiency & Automation Team"].engineers)
+                },
+                "Patient Care & Clinical Workflows Team": {
+                    totalSP: teamAnalytics["Patient Care & Clinical Workflows Team"].totalSP,
+                    completedSP: teamAnalytics["Patient Care & Clinical Workflows Team"].completedSP,
+                    engineers: Object.values(teamAnalytics["Patient Care & Clinical Workflows Team"].engineers)
+                }
+            }
         };
 
         res.json(report);

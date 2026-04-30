@@ -181,7 +181,7 @@ function App() {
     { value: 'overall', label: 'Overall Project Report' },
     { value: 'pmo', label: 'PMO Sprint Report' },
     { value: 'epic', label: 'Epic Breakdown' },
-    { value: 'releases', label: 'KPI Releases' }
+    { value: 'releases', label: 'Releases' }
   ];
   const selectedReportTypeOption = reportTypeOptions.find(option => option.value === reportType);
 
@@ -394,7 +394,7 @@ function App() {
         <div className="fade-in" style={{ animationDelay: '0.2s', display: 'flex', flexDirection: 'column', gap: '32px' }}>
 
           {reportType === 'pmo' ? (
-            <PMOReport data={reportData} projectKey={selectedProject} sprintId={selectedSprint} />
+            <PMOReport data={reportData} projectKey={selectedProject} sprintId={selectedSprint} projectName={selectedProjectOption?.name} />
           ) : reportType === 'releases' ? (
             <ReleaseReport data={reportData} projectKey={selectedProject} />
           ) : (
