@@ -3,6 +3,7 @@ const router = express.Router();
 const jiraController = require('../controllers/jiraController');
 const pmoController = require('../controllers/pmoController');
 const aiController = require('../controllers/aiController');
+const riskController = require('../controllers/riskController');
 
 // Route for fetching all projects
 router.get('/projects', jiraController.getProjects);
@@ -23,5 +24,11 @@ router.get('/reports/pmo-sprint/:projectKey/:sprintId', pmoController.getPMOSpri
 // AI Analysis Routes
 router.post('/ai/sprint-health', aiController.getSprintHealthAnalysis);
 router.post('/ai/release-health', aiController.getReleaseHealthAnalysis);
+
+// Manual Risks Routes
+router.get('/risks/:projectKey/:sprintId', riskController.getRisks);
+router.post('/risks', riskController.createRisk);
+router.put('/risks/:id', riskController.updateRisk);
+router.delete('/risks/:id', riskController.deleteRisk);
 
 module.exports = router;
