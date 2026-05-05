@@ -25,49 +25,49 @@ const DataTable = ({ issues }) => {
         );
     }
 
-    return (
-        <div className="glass-panel" style={{ padding: '24px', overflow: 'hidden' }}>
-            <h3 style={{ marginBottom: '16px', fontSize: '1.1rem' }}>Recent Activity & Tasks</h3>
-            <div className="data-table-container">
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>Key</th>
-                            <th>Summary</th>
-                            <th>Status</th>
-                            <th>Assignee</th>
-                            <th>Priority</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {issues.map(issue => (
-                            <tr key={issue.key}>
-                                <td style={{ fontWeight: 600, color: 'var(--text-accent)' }}>{issue.key}</td>
-                                <td style={{ maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {issue.summary}
-                                </td>
-                                <td>
-                                    <span className={`tag-badge ${getTagClass(issue.status)}`}>
-                                        {issue.status}
-                                    </span>
-                                </td>
-                                <td style={{ color: 'var(--text-secondary)' }}>{issue.assignee}</td>
-                                <td>
-                                    <span style={{ 
-                                        color: getPriorityColor(issue.priority),
-                                        fontWeight: 600,
-                                        fontSize: '0.85rem'
-                                    }}>
-                                        {issue.priority}
-                                    </span>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    );
+    // return (
+    //     <div className="glass-panel" style={{ padding: '24px', overflow: 'hidden' }}>
+    //         <h3 style={{ marginBottom: '16px', fontSize: '1.1rem' }}>Recent Activity & Tasks</h3>
+    //         <div className="data-table-container">
+    //             <table className="data-table">
+    //                 <thead>
+    //                     <tr>
+    //                         <th>Key</th>
+    //                         <th>Summary</th>
+    //                         <th>Status</th>
+    //                         <th>Assignee</th>
+    //                         <th>Priority</th>
+    //                     </tr>
+    //                 </thead>
+    //                 <tbody>
+    //                     {issues.map(issue => (
+    //                         <tr key={issue.key}>
+    //                             <td style={{ fontWeight: 600, color: 'var(--text-accent)' }}>{issue.key}</td>
+    //                             <td style={{ maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+    //                                 {issue.summary}
+    //                             </td>
+    //                             <td>
+    //                                 <span className={`tag-badge ${getTagClass(issue.status)}`}>
+    //                                     {issue.status}
+    //                                 </span>
+    //                             </td>
+    //                             <td style={{ color: 'var(--text-secondary)' }}>{issue.assignee}</td>
+    //                             <td>
+    //                                 <span style={{ 
+    //                                     color: getPriorityColor(issue.priority),
+    //                                     fontWeight: 600,
+    //                                     fontSize: '0.85rem'
+    //                                 }}>
+    //                                     {issue.priority}
+    //                                 </span>
+    //                             </td>
+    //                         </tr>
+    //                     ))}
+    //                 </tbody>
+    //             </table>
+    //         </div>
+    //     </div>
+    // );
 };
 
 export default DataTable;

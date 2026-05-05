@@ -24,6 +24,11 @@ export const getOverallReport = async (projectKey) => {
     return res.data;
 };
 
+export const getEpicsAggregatedReport = async (projectKey) => {
+    const res = await api.get(`/reports/epics-aggregated/${projectKey}`);
+    return res.data;
+};
+
 
 export const getEpicReport = async (projectKey, epicId) => {
     const res = await api.get(`/reports/epic/${projectKey}/${epicId}`);

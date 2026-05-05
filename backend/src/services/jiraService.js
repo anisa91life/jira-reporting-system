@@ -218,6 +218,130 @@ const jiraService = {
             if (allIssues.length >= 500) break;
         } while (nextPageToken);
         return { issues: allIssues, total: allIssues.length };
+    },
+
+    getEpicsAggregatedData: async (projectKey) => {
+        const api = getAxiosInstance();
+        
+        // 1. Fetch all Epics for the project
+        const epicJql = `project = "${projectKey}" AND issuetype = Epic ORDER BY created DESC`;
+        const epicPayload = {
+            jql: epicJql,
+            maxResults: 100,
+            fields: ["summary", "status", "priority", "issuetype", "duedate", "customfield_10015", "created"]
+        };
+        const epicResponse = await api.post('rest/api/3/search/jql', epicPayload);
+        const epics = epicResponse.data.issues || [];
+
+        if (epics.length === 0) return [];
+
+        const epicKeys = epics.map(e => e.key);
+        
+        // 2. Fetch all child issues for these Epics in bulk (avoid N+1)
+        // Using "parent" which works for modern Jira Cloud to find children of epics
+        const childrenJql = `project = "${projectKey}" AND parent IN ("${epicKeys.join('","')}") AND issuetype != Epic`;
+        
+        let allChildren = [];
+        let nextPageToken = null;
+        do {
+            const childPayload = {
+                jql: childrenJql,
+                maxResults: 100,
+                fields: ["summary", "status", "issuetype", "parent", "created", "resolutiondate"]
+            };
+            if (nextPageToken) childPayload.nextPageToken = nextPageToken;
+            
+            const response = await api.post('rest/api/3/search/jql', childPayload);
+            allChildren = allChildren.concat(response.data.issues || []);
+            nextPageToken = response.data.nextPageToken;
+            if (allChildren.length >= 2000) break; // Safety limit
+        } while (nextPageToken);
+
+        // 3. Map children to Epics and aggregate
+        const epicMap = {};
+        epics.forEach(epic => {
+            epicMap[epic.key] = {
+                id: epic.id,
+                key: epic.key,
+                epicName: epic.fields.summary,
+                status: epic.fields.status?.name || 'Unknown',
+                statusCategory: epic.fields.status?.statusCategory?.key || '',
+                startDate: epic.fields.customfield_10015 || null,
+                dueDate: epic.fields.duedate || null,
+                totalIssues: 0,
+                completedIssues: 0,
+                children: []
+            };
+        });
+
+        allChildren.forEach(child => {
+            const parentKey = child.fields.parent?.key;
+            if (parentKey && epicMap[parentKey]) {
+                const isCancelled = child.fields.status?.name?.toLowerCase().includes('cancelled') || 
+                                   child.fields.status?.name?.toLowerCase().includes('dropped') ||
+                                   child.fields.status?.name?.toLowerCase().includes('removed');
+                
+                if (isCancelled) return;
+
+                epicMap[parentKey].totalIssues++;
+                
+                const isDone = child.fields.status?.statusCategory?.key === 'done';
+                if (isDone) {
+                    epicMap[parentKey].completedIssues++;
+                }
+
+                // Collect child details for the dropdown
+                epicMap[parentKey].children.push({
+                    key: child.key,
+                    summary: child.fields.summary,
+                    status: child.fields.status?.name,
+                    statusCategory: child.fields.status?.statusCategory?.key,
+                    issuetype: child.fields.issuetype?.name,
+                    created: child.fields.created,
+                    resolutiondate: child.fields.resolutiondate
+                });
+
+                // Derive start/end dates from children if not present on Epic
+                const childCreated = child.fields.created;
+                const childResolved = child.fields.resolutiondate;
+
+                if (!epicMap[parentKey].startDate || new Date(childCreated) < new Date(epicMap[parentKey].startDate)) {
+                    if (!epicMap[parentKey].startDate) {
+                         if (!epicMap[parentKey].derivedStartDate || new Date(childCreated) < new Date(epicMap[parentKey].derivedStartDate)) {
+                             epicMap[parentKey].derivedStartDate = childCreated;
+                         }
+                    }
+                }
+
+                if (isDone && childResolved) {
+                    if (!epicMap[parentKey].derivedEndDate || new Date(childResolved) > new Date(epicMap[parentKey].derivedEndDate)) {
+                        epicMap[parentKey].derivedEndDate = childResolved;
+                    }
+                }
+            }
+        });
+
+        // Finalize calculations
+        return Object.values(epicMap).map(epic => {
+            const total = epic.totalIssues;
+            const completed = epic.completedIssues;
+            const completionPercentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+            
+            // Final date selection
+            const startDate = epic.startDate || epic.derivedStartDate || null;
+            // End Date: custom field or latest child issue completion date
+            // Note: Epics don't usually have a standard "End Date" custom field other than Due Date or a specific one.
+            // I'll use derivedEndDate as the End Date if no other field is provided.
+            const endDate = epic.derivedEndDate || null;
+
+            return {
+                ...epic,
+                startDate,
+                endDate,
+                completionPercentage,
+                isOverdue: epic.dueDate && new Date(epic.dueDate) < new Date() && completionPercentage < 100
+            };
+        });
     }
 };
 
