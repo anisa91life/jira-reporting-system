@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Layers, Activity, ActivitySquare, CheckCircle, Users, AlertTriangle } from 'lucide-react';
+import { Layers, Activity, ActivitySquare, CheckCircle, Users, AlertTriangle, Sun, Moon } from 'lucide-react';
 import * as api from './api/jiraApi';
 import ReportCard from './components/ReportCard';
 import { StatusPieChart, PriorityPieChart } from './components/Charts';
 import DataTable from './components/DataTable';
 import PMOReport from './components/PMOReport';
 import ReleaseReport from './components/ReleaseReport';
+import EpicAggregatedReport from './components/EpicAggregatedReport';
 
 const getInitialState = (key, defaultVal) => {
   const params = new URLSearchParams(window.location.search);
@@ -27,9 +28,20 @@ function App() {
   // Specific selections
   const [selectedSprint, setSelectedSprint] = useState(() => getInitialState('sprintId', ''));
   const [selectedEpic, setSelectedEpic] = useState(() => getInitialState('epicId', ''));
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
   const [isSprintDropdownOpen, setIsSprintDropdownOpen] = useState(false);
   const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
   const [isReportTypeDropdownOpen, setIsReportTypeDropdownOpen] = useState(false);
+
+  // Sync theme to document and localStorage
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
 
   // Data
   const [reportData, setReportData] = useState(null);
@@ -112,8 +124,11 @@ function App() {
           setReportData(d);
         } else {
           // Overall Report
-          const d = await api.getOverallReport(selectedProject);
-          setReportData(d);
+          const [overall, epicsAgg] = await Promise.all([
+            api.getOverallReport(selectedProject),
+            api.getEpicsAggregatedReport(selectedProject)
+          ]);
+          setReportData({ ...overall, epicsAggregated: epicsAgg });
         }
       } catch (err) {
         setError('Failed to fetch data');
@@ -222,8 +237,17 @@ function App() {
           </h1>
           <p style={{ color: 'var(--text-secondary)' }}>Advanced reporting and analytics dashboard</p>
         </div>
-        <div style={{ background: 'rgba(56, 189, 248, 0.1)', color: 'var(--text-accent)', padding: '8px 16px', borderRadius: 'var(--radius-xl)', fontSize: '0.85rem', fontWeight: 600 }}>
-          {selectedProject ? `ACTIVE PROJ: ${selectedProject}` : "SELECT A PROJECT"}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <button 
+            onClick={toggleTheme}
+            className="theme-toggle"
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          >
+            {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+          <div style={{ background: 'rgba(56, 189, 248, 0.1)', color: 'var(--text-accent)', padding: '8px 16px', borderRadius: 'var(--radius-xl)', fontSize: '0.85rem', fontWeight: 600 }}>
+            {selectedProject ? `ACTIVE PROJ: ${selectedProject}` : "SELECT A PROJECT"}
+          </div>
         </div>
       </div>
 
@@ -415,7 +439,6 @@ function App() {
                   />
                 </div>
               )}
-
               {/* Epic Mode Cards */}
               {reportType === 'epic' && (
                 <div className="grid-cards">
@@ -446,6 +469,10 @@ function App() {
                   </div>
                 </div>
               </div>
+
+              {reportType === 'overall' && (
+                <EpicAggregatedReport data={reportData} projectKey={selectedProject} />
+              )}
 
               {reportType === 'epic' && (
                 <div className="chart-panel fade-in" style={{ padding: '24px', display: 'flex', flexDirection: 'column', animationDelay: '0.35s' }}>

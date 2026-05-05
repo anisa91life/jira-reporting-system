@@ -423,11 +423,23 @@ const getProjectReleasesReport = async (req, res) => {
     }
 };
 
+const getEpicsAggregatedReport = async (req, res) => {
+    const { projectKey } = req.params;
+    try {
+        const data = await jiraService.getEpicsAggregatedData(projectKey);
+        res.json(data);
+    } catch (error) {
+        console.error("Epic Aggregated Report Error:", error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
 module.exports = {
     getProjects,
     getProjectSprints,
     getProjectEpics,
     getOverallReport,
     getProjectReleasesReport,
-    getEpicReport
+    getEpicReport,
+    getEpicsAggregatedReport
 };

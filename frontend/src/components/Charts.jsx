@@ -6,7 +6,7 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'
 const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
         return (
-            <div className="glass-panel" style={{ padding: '12px 16px', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div className="glass-panel" style={{ padding: '12px 16px', border: '1px solid var(--border-color)' }}>
                 <p style={{ margin: 0, fontWeight: 600 }}>{`${payload[0].name}: ${payload[0].value}`}</p>
             </div>
         );
@@ -18,7 +18,7 @@ const CustomStatusLegend = ({ payload }) => {
     return (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '10px 16px' }}>
             {payload.map((entry, index) => (
-                <li key={`item-${index}`} style={{ display: 'flex', alignItems: 'center', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                <li key={`item-${index}`} style={{ display: 'flex', alignItems: 'center', fontSize: '14px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
                     <span style={{ display: 'inline-block', width: '10px', height: '10px', backgroundColor: entry.color, borderRadius: '50%', marginRight: '8px', flexShrink: 0 }}></span>
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.value}</span>
                 </li>
