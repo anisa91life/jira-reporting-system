@@ -1,16 +1,83 @@
-import React, { useState } from 'react';
-import { AlertCircle, CheckCircle, TrendingUp, TrendingDown, Clock, Bug, Shield, ArrowRight, CornerDownRight, Calendar, Info, Cpu, Loader, Layers, Activity, ActivitySquare, Users, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { AlertCircle, CheckCircle, TrendingUp, TrendingDown, Clock, Bug, Shield, ArrowRight, CornerDownRight, Calendar, Info, Cpu, Loader, Layers, Activity, ActivitySquare, Users, ChevronDown, ChevronUp, Plus, Trash2, Edit2 } from 'lucide-react';
 import { CommitmentChart, BugTrendChart, WorkDistributionChart } from './PMOCharts';
 import { StatusPieChart, PriorityPieChart } from './Charts';
 import ReportCard from './ReportCard';
 import InfoTooltip from './InfoTooltip';
-import { getAISprintHealth } from '../api/jiraApi';
+import { getAISprintHealth, getManualRisks, createManualRisk, updateManualRisk, deleteManualRisk } from '../api/jiraApi';
 
 const PMOReport = ({ data, projectKey, sprintId, projectName }) => {
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiError, setAiError] = useState('');
   const [expandedTeams, setExpandedTeams] = useState({});
+  const [manualRisks, setManualRisks] = useState([]);
+  const [isAddingRisk, setIsAddingRisk] = useState(false);
+  const [newRisk, setNewRisk] = useState({ title: '', description: '', severity: 'Medium' });
+  const [editingRiskId, setEditingRiskId] = useState(null);
+  const [editRisk, setEditRisk] = useState({ title: '', description: '', severity: 'Medium' });
+
+  useEffect(() => {
+    if (projectKey && sprintId && data && data.status !== 'NOT_STARTED') {
+      loadManualRisks();
+    }
+  }, [projectKey, sprintId, data]);
+
+  const loadManualRisks = async () => {
+    try {
+      const risks = await getManualRisks(projectKey, sprintId);
+      setManualRisks(risks);
+    } catch (err) {
+      console.error('Failed to load manual risks', err);
+    }
+  };
+
+  const handleAddRisk = async () => {
+    if (!newRisk.title.trim()) return;
+    try {
+      const addedRisk = await createManualRisk({
+        projectKey,
+        sprintId,
+        title: newRisk.title,
+        description: newRisk.description,
+        severity: newRisk.severity
+      });
+      setManualRisks([addedRisk, ...manualRisks]);
+      setNewRisk({ title: '', description: '', severity: 'Medium' });
+      setIsAddingRisk(false);
+    } catch (err) {
+      console.error('Failed to add manual risk', err);
+    }
+  };
+
+  const handleUpdateRisk = async () => {
+    if (!editRisk.title.trim()) return;
+    try {
+      const updatedRisk = await updateManualRisk(editingRiskId, {
+        title: editRisk.title,
+        description: editRisk.description,
+        severity: editRisk.severity
+      });
+      setManualRisks(manualRisks.map(r => r.id === editingRiskId ? updatedRisk : r));
+      setEditingRiskId(null);
+    } catch (err) {
+      console.error('Failed to update manual risk', err);
+    }
+  };
+
+  const startEditRisk = (risk) => {
+    setEditingRiskId(risk.id);
+    setEditRisk({ title: risk.title, description: risk.description || '', severity: risk.severity });
+  };
+
+  const handleDeleteRisk = async (id) => {
+    try {
+      await deleteManualRisk(id);
+      setManualRisks(manualRisks.filter(r => r.id !== id));
+    } catch (err) {
+      console.error('Failed to delete manual risk', err);
+    }
+  };
 
   const toggleTeam = (teamName) => {
     setExpandedTeams(prev => ({ ...prev, [teamName]: !prev[teamName] }));
@@ -285,17 +352,131 @@ const PMOReport = ({ data, projectKey, sprintId, projectName }) => {
       {/* 3. Risks & Decisions */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
         <div className="glass-panel" style={{ padding: '24px' }}>
-          <h3 style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <AlertCircle color="var(--accent-danger)" size={20} />
-            Risks & Blockers
-          </h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+              <AlertCircle color="var(--accent-danger)" size={20} />
+              Risks & Blockers
+            </h3>
+            <button 
+              onClick={() => setIsAddingRisk(!isAddingRisk)}
+              style={{ background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-primary)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}
+            >
+              <Plus size={14} /> Add Risk
+            </button>
+          </div>
+
+          {/* Form to add risk */}
+          {isAddingRisk && (
+            <div style={{ marginBottom: '16px', padding: '12px', background: 'rgba(0,0,0,0.1)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+              <input 
+                 value={newRisk.title}
+                 onChange={e => setNewRisk({...newRisk, title: e.target.value})}
+                 placeholder="Risk title..."
+                 style={{ width: '100%', padding: '8px', marginBottom: '8px', background: 'var(--bg-main)', border: '1px solid var(--border-light)', borderRadius: '4px', color: 'var(--text-primary)' }}
+              />
+              <input 
+                 value={newRisk.description}
+                 onChange={e => setNewRisk({...newRisk, description: e.target.value})}
+                 placeholder="Risk description (optional)..."
+                 style={{ width: '100%', padding: '8px', marginBottom: '8px', background: 'var(--bg-main)', border: '1px solid var(--border-light)', borderRadius: '4px', color: 'var(--text-primary)' }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                 <select 
+                    value={newRisk.severity}
+                    onChange={e => setNewRisk({...newRisk, severity: e.target.value})}
+                    style={{ padding: '6px', background: 'var(--bg-main)', border: '1px solid var(--border-light)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                 >
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                 </select>
+                 <div style={{ display: 'flex', gap: '8px' }}>
+                   <button onClick={() => setIsAddingRisk(false)} style={{ padding: '6px 12px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>Cancel</button>
+                   <button onClick={handleAddRisk} style={{ padding: '6px 12px', background: 'var(--accent-primary)', border: 'none', color: 'white', borderRadius: '4px', cursor: 'pointer' }}>Save</button>
+                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* System Risks */}
           {risks.map((risk, idx) => (
-            <div key={idx} className="pmo-risk-item">
-              <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '4px' }}>[{risk.level}] {risk.description}</div>
+            <div key={`sys-${idx}`} className="pmo-risk-item" style={{ marginBottom: '12px' }}>
+              <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '4px', color: '#fff' }}>
+                <span style={{ color: risk.level === 'High' ? 'var(--accent-danger)' : risk.level === 'Medium' ? 'var(--accent-warning)' : '#3B82F6' }}>
+                  [{risk.level}]
+                </span>{' '}
+                {risk.description}{' '}
+                <span style={{ color: 'var(--text-secondary)', opacity: 0.6, fontSize: '0.75rem', fontWeight: 'normal' }}>(Auto)</span>
+              </div>
               <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <ArrowRight size={14} /> impact: {risk.impact} | Sugested: {risk.action}
               </div>
             </div>
+          ))}
+
+          {/* Manual Risks */}
+          {manualRisks.map(risk => (
+             <div key={`man-${risk.id}`} className="pmo-risk-item" style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+               {editingRiskId === risk.id ? (
+                 <div style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.02)', borderRadius: '4px' }}>
+                   <input 
+                     value={editRisk.title}
+                     onChange={e => setEditRisk({...editRisk, title: e.target.value})}
+                     placeholder="Risk title..."
+                     style={{ width: '100%', padding: '6px', marginBottom: '6px', background: 'var(--bg-main)', border: '1px solid var(--border-light)', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '0.9rem' }}
+                   />
+                   <input 
+                     value={editRisk.description}
+                     onChange={e => setEditRisk({...editRisk, description: e.target.value})}
+                     placeholder="Risk description (optional)..."
+                     style={{ width: '100%', padding: '6px', marginBottom: '6px', background: 'var(--bg-main)', border: '1px solid var(--border-light)', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                   />
+                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                     <select 
+                        value={editRisk.severity}
+                        onChange={e => setEditRisk({...editRisk, severity: e.target.value})}
+                        style={{ padding: '4px 6px', background: 'var(--bg-main)', border: '1px solid var(--border-light)', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                     >
+                        <option value="High">High</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Low">Low</option>
+                     </select>
+                     <div style={{ display: 'flex', gap: '6px' }}>
+                       <button onClick={() => setEditingRiskId(null)} style={{ padding: '4px 10px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.85rem' }}>Cancel</button>
+                       <button onClick={handleUpdateRisk} style={{ padding: '4px 10px', background: 'var(--accent-primary)', border: 'none', color: 'white', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}>Update</button>
+                     </div>
+                   </div>
+                 </div>
+               ) : (
+                 <>
+                   <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '4px', color: '#fff' }}>
+                        <span style={{ color: risk.severity === 'High' ? 'var(--accent-danger)' : risk.severity === 'Medium' ? 'var(--accent-warning)' : '#3B82F6' }}>
+                          [{risk.severity}]
+                        </span>{' '}
+                        {risk.title}{' '}
+                        <span style={{ color: 'var(--text-secondary)', opacity: 0.6, fontSize: '0.75rem', fontWeight: 'normal' }}>(Manual)</span>
+                      </div>
+                      {risk.description && (
+                        <div style={{ color: 'var(--text-primary)', fontSize: '0.85rem', marginBottom: '4px', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                          <ArrowRight size={14} style={{ marginTop: '2px', color: 'var(--text-secondary)' }} /> {risk.description}
+                        </div>
+                      )}
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: risk.description ? '8px' : '4px' }}>
+                        Created: {new Date(risk.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </div>
+                   </div>
+                   <div style={{ display: 'flex', gap: '4px', alignItems: 'flex-start' }}>
+                     <button onClick={() => startEditRisk(risk)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}>
+                       <Edit2 size={15} />
+                     </button>
+                     <button onClick={() => handleDeleteRisk(risk.id)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}>
+                       <Trash2 size={16} />
+                     </button>
+                   </div>
+                 </>
+               )}
+             </div>
           ))}
         </div>
 

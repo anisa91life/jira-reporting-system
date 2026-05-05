@@ -49,3 +49,24 @@ export const getAIReleaseHealth = async (releaseData) => {
     const res = await api.post('/ai/release-health', releaseData);
     return res.data;
 };
+
+// Manual Risks API
+export const getManualRisks = async (projectKey, sprintId) => {
+    const res = await api.get(`/risks/${projectKey}/${sprintId}`);
+    return res.data.risks;
+};
+
+export const createManualRisk = async (riskData) => {
+    const res = await api.post('/risks', riskData);
+    return res.data.risk;
+};
+
+export const updateManualRisk = async (id, riskData) => {
+    const res = await api.put(`/risks/${id}`, riskData);
+    return res.data.risk;
+};
+
+export const deleteManualRisk = async (id) => {
+    const res = await api.delete(`/risks/${id}`);
+    return res.data;
+};
